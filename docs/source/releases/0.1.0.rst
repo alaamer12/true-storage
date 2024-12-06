@@ -1,0 +1,83 @@
+Version 0.1.0
+=============
+
+Release Date: 2024-01-15
+
+Initial release of True Storage, a versatile Python storage library.
+
+Major Features
+-------------
+
+Storage Backends
+~~~~~~~~~~~~~~
+* Hot Storage: In-memory storage with LRU caching
+* Cold Storage: Disk-based storage with compression
+* Mixed Storage: Tiered storage combining hot and cold strategies
+* SQLite Storage: SQL-based persistent storage
+* Filesystem Storage: File-based hierarchical storage
+
+Session Management
+~~~~~~~~~~~~~~~~
+* Basic session handling with CRUD operations
+* Session expiration and auto-cleanup
+* Thread-safe session operations
+* Persistent sessions with multiple backends
+* Advanced session features (events, migration)
+
+Environment Management
+~~~~~~~~~~~~~~~~~~~
+* Environment variable management
+* Mode-specific configurations
+* Environment snapshots
+* Advanced validation and type conversion
+* Dynamic configuration support
+
+Core Features
+~~~~~~~~~~~
+* Thread-safe operations
+* Atomic file operations
+* Compression support (zlib, zstd, lz4)
+* Performance monitoring and statistics
+* Extensive error handling
+* Type hints throughout codebase
+
+Integrations
+~~~~~~~~~~~
+* Pydantic v1 and v2 support
+* SQLite integration
+* Custom serialization support
+* Extensible backend system
+
+Documentation
+~~~~~~~~~~~~
+* Comprehensive API documentation
+* Detailed usage examples
+* Installation guides
+* Best practices and tips
+
+Breaking Changes
+--------------
+* Initial release - no breaking changes
+
+Deprecations
+-----------
+* Initial release - no deprecations
+
+Bug Fixes
+--------
+* Initial release - no bug fixes
+
+Known Issues
+-----------
+* Large file handling in FileSystemStorage may be memory intensive
+* Session cleanup might delay under heavy load
+* Limited support for concurrent SQLite operations
+
+Future Plans
+-----------
+* Redis backend support
+* MongoDB integration
+* Enhanced compression options
+* Performance optimizations
+* Additional storage backends
+* Expanded test coverage

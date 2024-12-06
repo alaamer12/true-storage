@@ -80,18 +80,6 @@ def demo_cold_storage():
     # Clean up
     cold_storage.clear()
 
-def demo_mixed_storage():
-    print("\n=== Mixed Storage Demo ===")
-    mixed_storage = MixedStorage(max_size=100, expiration_time=300)
-    
-    # Store session data
-    session_data = {"user_id": 123, "permissions": ["read", "write"]}
-    mixed_storage.store_session("session1", session_data)
-    
-    # Retrieve session
-    retrieved_session = mixed_storage.retrieve_session("session1")
-    print(f"Retrieved session: {retrieved_session}")
-
 def demo_session_store():
     print("\n=== Session Store Demo ===")
     config = SessionStoreConfig(max_size=1000, expiration_time=3600)
@@ -118,7 +106,7 @@ def main():
     demo_sqlite_storage()
     demo_hot_storage()
     demo_cold_storage()
-    demo_mixed_storage()
+    # demo_mixed_storage()
     demo_session_store()
 
 if __name__ == "__main__":

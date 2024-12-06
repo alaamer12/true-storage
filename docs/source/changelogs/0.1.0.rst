@@ -1,0 +1,65 @@
+0.1.0 Changelog
+===============
+
+Added
+-----
+* Initial implementation of storage backends
+  - Hot Storage (in-memory with LRU)
+  - Cold Storage (disk-based)
+  - Mixed Storage (tiered)
+  - SQLite Storage
+  - Filesystem Storage
+
+* Session management system
+  - Basic CRUD operations
+  - Expiration handling
+  - Thread safety
+  - Persistence
+  - Advanced features
+
+* Environment management
+  - Variable handling
+  - Mode-specific configs
+  - Snapshots
+  - Validation
+
+* Core functionality
+  - Thread safety
+  - Atomic operations
+  - Compression support
+  - Performance monitoring
+  - Type hints
+
+* Integration support
+  - Pydantic v1/v2
+  - SQLite
+  - Custom serializers
+
+* Documentation
+  - API reference
+  - Usage examples
+  - Installation guides
+  - Best practices
+
+Changed
+-------
+* Initial release - no changes
+
+Deprecated
+----------
+* Initial release - no deprecations
+
+Removed
+-------
+* Initial release - no removals
+
+Fixed
+-----
+* Initial release - no fixes
+
+Security
+--------
+* Initial release - basic security features implemented
+* Atomic file operations
+* Thread-safe implementations
+* Secure temporary file handling
