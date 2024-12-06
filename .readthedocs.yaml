@@ -1,0 +1,47 @@
+version: 2
+
+# Set the OS, Python version and other tools
+build:
+  os: ubuntu-22.04
+  tools:
+    python: "3.11"
+    # You can also specify other tool versions:
+    # nodejs: "19"
+    # rust: "1.64"
+  jobs:
+    pre_build:
+      # Generate API documentation
+      - sphinx-apidoc -o docs/source true
+      - python -m pip install --upgrade pip
+
+# Build documentation in the docs/source directory with Sphinx
+sphinx:
+  configuration: docs/source/conf.py
+  builder: html
+  fail_on_warning: true  # Ensure high documentation quality
+
+# Optionally declare the Python requirements required to build your docs
+python:
+  install:
+    - requirements: requirements/docs.txt
+    - method: pip
+      path: .
+      extra_requirements:
+        - docs
+
+# Search settings
+search:
+  ranking:
+    api/*: -1
+    changelog/*: 5
+    releases/*: 5
+    getting-started/*: 4
+    tutorials/*: 3
+  ignore:
+    - changelog/unreleased.rst
+    - _build/*
+    - _static/*
+
+
+# Build all formats
+formats: all
