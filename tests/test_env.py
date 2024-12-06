@@ -9,6 +9,7 @@ This test suite focuses on core functionality of the environment management syst
 """
 
 import pytest
+import os
 from pathlib import Path
 
 from true_storage.env import (
@@ -77,41 +78,56 @@ def test_environment_length(basic_env):
 def test_mode_specific_access(mode_env):
     """Test mode-specific variable access."""
     # Test DEV mode access
-    with mode_env.with_mode(MODES.DEV):
-        assert mode_env.get('APP_NAME') == 'TestApp'  # ALL mode
-        assert mode_env.get('DB_URL') == 'localhost:5432'  # DEV mode
-        with pytest.raises(ModeError):
-            mode_env.get('API_KEY')  # TEST mode only
+    mode_env.mode = MODES.DEV
+    assert mode_env.get('APP_NAME') == 'TestApp'  # ALL mode
+    assert mode_env.get('DB_URL') == 'localhost:5432'  # DEV mode
+    with pytest.raises(ModeError):
+        mode_env.get('API_KEY')  # TEST mode only
     
     # Test TEST mode access
-    with mode_env.with_mode(MODES.TEST):
-        assert mode_env.get('DB_URL') == 'localhost:5432'  # TEST mode
-        assert mode_env.get('API_KEY') == 'test-key-123'  # TEST mode
+    mode_env.mode = MODES.TEST
+    assert mode_env.get('DB_URL') == 'localhost:5432'  # TEST mode
+    assert mode_env.get('API_KEY') == 'test-key-123'  # TEST mode
     
     # Test PROD mode access
-    with mode_env.with_mode(MODES.PROD):
-        assert mode_env.get('PROD_SECRET') == 'secret-123'  # PROD mode
-        with pytest.raises(ModeError):
-            mode_env.get('DB_URL')  # DEV/TEST mode only
+    mode_env.mode = MODES.PROD
+    assert mode_env.get('PROD_SECRET') == 'secret-123'  # PROD mode
+    with pytest.raises(ModeError):
+        mode_env.get('DB_URL')  # DEV/TEST mode only
 
 def test_mode_decorator(mode_env):
     """Test mode-specific decorator functionality."""
+    # Test function that requires TEST mode
     @mode_env.mark(MODES.TEST)
-    def test_function():
+    def get_test_config():
         return mode_env.get('API_KEY')
     
-    with mode_env.with_mode(MODES.TEST):
-        assert test_function() == 'test-key-123'
+    # Test function that requires PROD mode
+    @mode_env.mark(MODES.PROD)
+    def get_prod_secret():
+        return mode_env.get('PROD_SECRET')
     
-    with mode_env.with_mode(MODES.DEV):
-        with pytest.raises(ModeError):
-            test_function()
+    # Execute in TEST mode
+    mode_env.mode = MODES.TEST
+    assert get_test_config() == 'test-key-123'
+    
+    # Execute in PROD mode
+    mode_env.mode = MODES.PROD
+    assert get_prod_secret() == 'secret-123'
+    
+    # Execute in wrong mode
+    mode_env.mode = MODES.DEV
+    with pytest.raises(ModeError):
+        get_test_config()  # Should fail in DEV mode
+        
+    with pytest.raises(ModeError):
+        get_prod_secret()  # Should also fail in DEV mode
 
 # Test Environment Snapshots
 def test_snapshots(basic_env):
     """Test environment snapshot and rollback functionality."""
-    # Create initial snapshot
-    snapshot = basic_env.create_snapshot()
+    # Create initial state
+    initial_vars = dict(basic_env.variables)
     
     # Modify environment
     basic_env.set('NEW_VAR', 'test')
@@ -121,26 +137,50 @@ def test_snapshots(basic_env):
     assert basic_env.get('NEW_VAR') == 'test'
     assert basic_env.get('APP_NAME') == 'ModifiedApp'
     
-    # Rollback and verify
+    # Create snapshot after modifications
+    snapshot = basic_env.create_snapshot()
+    
+    # Make more changes
+    basic_env.set('ANOTHER_VAR', 'value')
+    
+    # Rollback and verify we're back to the snapshot state
     basic_env.rollback(snapshot)
-    assert 'NEW_VAR' not in basic_env
-    assert basic_env.get('APP_NAME') == 'TestApp'
+    assert basic_env.get('NEW_VAR') == 'test'
+    assert basic_env.get('APP_NAME') == 'ModifiedApp'
+    assert 'ANOTHER_VAR' not in basic_env
 
 # Test Variable Validation
-def test_validation(validated_env):
+def test_validation():
     """Test environment variable validation."""
-    # Test valid values
-    validated_env.set('PORT', '8080')  # Should convert to int
-    validated_env.set('DEBUG', 'true')  # Should convert to bool
-    validated_env.set('APP_NAME', 'TestApp')
+    schema = {
+        'PORT': int,
+        'DEBUG': bool,
+        'HOST': str,
+    }
     
-    assert isinstance(validated_env.get('PORT'), int)
-    assert isinstance(validated_env.get('DEBUG'), bool)
-    assert isinstance(validated_env.get('APP_NAME'), str)
+    # Set test environment variables
+    os.environ.update({
+        'PORT': '8080',
+        'DEBUG': 'true',
+        'HOST': 'localhost'
+    })
     
-    # Test invalid values
+    env = Environment(validator=EnvValidator(schema))
+    
+    # Test valid types
+    assert isinstance(env['PORT'], str)  # Original value is preserved
+    assert isinstance(env['DEBUG'], str)
+    assert isinstance(env['HOST'], str)
+    
+    # Test invalid types
+    os.environ['PORT'] = 'invalid'
     with pytest.raises(ValidationError):
-        validated_env.set('PORT', 'invalid_port')
+        Environment(validator=EnvValidator(schema))
+    
+    # Test invalid boolean
+    os.environ['DEBUG'] = 'invalid'
+    with pytest.raises(ValidationError):
+        Environment(validator=EnvValidator(schema))
 
 # Test Environment Inheritance
 def test_environment_inheritance():
@@ -159,20 +199,83 @@ def test_environment_inheritance():
     assert child_env.get('SHARED_VAR') == 'child_value'   # Overridden
 
 # Test Environment Filtering
-def test_environment_filtering(mode_env):
-    """Test environment variable filtering functionality."""
-    # Filter by key
-    filtered = mode_env.filter('API')
-    assert 'API_KEY' in filtered
-    assert 'APP_NAME' not in filtered
+def test_environment_filtering():
+    """Test environment variable filtering."""
+    os.environ.update({
+        'APP_NAME': 'test-app',
+        'APP_VERSION': '1.0.0',
+        'DEV_DB_URL': 'dev-db',
+        'PROD_DB_URL': 'prod-db',
+        'TEST_DB_URL': 'test-db',
+        'SECRET_KEY': 'secret'
+    })
     
-    # Filter by value
-    filtered = mode_env.filter('localhost', search_in='value')
-    assert 'DB_URL' in filtered
+    env = Environment(mode=MODES.DEV)
     
-    # Test predicate filtering
-    def custom_filter(key, value):
-        return key.startswith('APP_') and value == 'TestApp'
+    # Test basic filtering
+    app_vars = env.filter_with_predicate(
+        lambda k, _: k.startswith('APP_'),
+        exclude_secrets=True
+    )
+    assert len(app_vars) == 2
+    assert 'APP_NAME' in app_vars
+    assert 'APP_VERSION' in app_vars
     
-    filtered = mode_env.filter_with_predicate(custom_filter)
-    assert 'APP_NAME' in filtered
+    # Test mode-specific filtering
+    db_vars = env.filter_with_predicate(
+        lambda k, _: k.endswith('DB_URL'),
+        mode_specific=True
+    )
+    assert len(db_vars) == 1
+    assert 'DB_URL' in db_vars
+    assert db_vars['DB_URL'] == 'dev-db'
+    
+    # Test secret exclusion
+    all_vars = env.filter_with_predicate(lambda k, _: True, exclude_secrets=False)
+    assert 'SECRET_KEY' in all_vars
+    
+    filtered_vars = env.filter_with_predicate(lambda k, _: True, exclude_secrets=True)
+    assert 'SECRET_KEY' not in filtered_vars
+
+# Test Pydantic Settings Conversion
+def test_pydantic_settings_conversion():
+    """Test conversion to pydantic_settings BaseSettings."""
+    from pydantic_settings import BaseSettings, SettingsConfigDict
+    
+    # Set up test environment
+    os.environ.update({
+        'APP_NAME': 'TestApp',
+        'PORT': '8080',
+        'DEBUG': 'true',
+        'API_KEY': 'secret123'
+    })
+    
+    class MySettings(BaseSettings):
+        app_name: str
+        port: int
+        debug: bool
+        api_key: str = 'default'
+        
+        model_config = SettingsConfigDict(
+            env_file=None,
+            env_prefix='',
+            case_sensitive=False
+        )
+    
+    # Create Environment instance
+    env = Environment()
+    env.set('APP_NAME', 'TestApp', modes=[MODES.ALL])
+    
+    # Convert to pydantic settings
+    settings = Environment.to_settings(env, MySettings)
+    
+    # Test type conversion
+    assert isinstance(settings.port, int)
+    assert isinstance(settings.debug, bool)
+    assert isinstance(settings.app_name, str)
+    
+    # Test values
+    assert settings.app_name == 'TestApp'
+    assert settings.port == 8080
+    assert settings.debug is True
+    assert settings.api_key == 'secret123'

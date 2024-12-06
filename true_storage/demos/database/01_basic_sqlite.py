@@ -1,102 +1,69 @@
-"""
-Basic SQLite Demo
+"""Basic SQLite Storage Demo
 
-This demo shows basic operations with the SQLite database backend.
+This demo shows basic operations with the SQLite storage backend.
 """
 
 import logging
-from true_storage.database.sqlite import SQLiteStore
+from true_storage.database import SQLiteStorage
 
 def main():
     # Configure logging
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s'
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
 
     print("🚀 Initializing SQLite Store...")
     # Create an in-memory database for demonstration
-    store = SQLiteStore(":memory:")
+    store = SQLiteStorage(":memory:")
 
-    # Create a table
-    print("\n📝 Creating a sample table...")
-    store.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY,
-            name TEXT NOT NULL,
-            email TEXT UNIQUE
-        )
-    """)
-
-    # Insert data
-    print("\n➕ Inserting sample data...")
-    users = [
-        ("Alice", "alice@example.com"),
-        ("Bob", "bob@example.com"),
-        ("Charlie", "charlie@example.com")
-    ]
+    print("\n📝 Storing and retrieving data...")
     
-    for name, email in users:
-        store.execute(
-            "INSERT INTO users (name, email) VALUES (?, ?)",
-            (name, email)
-        )
+    # Store some user data
+    user1 = {
+        "id": 1,
+        "name": "Alice",
+        "email": "alice@example.com"
+    }
+    user2 = {
+        "id": 2,
+        "name": "Bob",
+        "email": "bob@example.com"
+    }
+    
+    # Store users
+    store.store("user:1", user1)
+    store.store("user:2", user2)
+    print("✅ Stored user data")
 
-    # Query data
-    print("\n🔍 Querying all users:")
-    results = store.execute("SELECT * FROM users")
-    for row in results:
-        print(f"User {row[0]}: {row[1]} ({row[2]})")
+    # Retrieve users
+    retrieved_user1 = store.retrieve("user:1")
+    print(f"\nRetrieved User 1:")
+    print(f"Name: {retrieved_user1['name']}")
+    print(f"Email: {retrieved_user1['email']}")
 
-    # Update data
-    print("\n✏️ Updating user data...")
-    store.execute(
-        "UPDATE users SET email = ? WHERE name = ?",
-        ("alice.new@example.com", "Alice")
-    )
+    retrieved_user2 = store.retrieve("user:2")
+    print(f"\nRetrieved User 2:")
+    print(f"Name: {retrieved_user2['name']}")
+    print(f"Email: {retrieved_user2['email']}")
 
-    # Query specific user
-    print("\n🔍 Querying specific user:")
-    result = store.execute(
-        "SELECT * FROM users WHERE name = ?",
-        ("Alice",)
-    ).fetchone()
-    print(f"Updated user: {result[1]} ({result[2]})")
-
-    # Delete data
-    print("\n❌ Deleting user...")
-    store.execute("DELETE FROM users WHERE name = ?", ("Bob",))
-
-    # Final count
-    print("\n📊 Final user count:")
-    count = store.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-    print(f"Remaining users: {count}")
-
-    # Demonstrate transaction
-    print("\n🔄 Demonstrating transaction...")
+    # Delete a user
+    print("\n🗑️ Deleting User 1...")
+    store.delete("user:1")
+    
     try:
-        with store.transaction():
-            store.execute(
-                "INSERT INTO users (name, email) VALUES (?, ?)",
-                ("Dave", "dave@example.com")
-            )
-            # Simulate an error
-            if True:  # For demonstration
-                raise Exception("Simulated error")
-            store.execute(
-                "INSERT INTO users (name, email) VALUES (?, ?)",
-                ("Eve", "eve@example.com")
-            )
-    except Exception as e:
-        print(f"Transaction rolled back: {e}")
+        store.retrieve("user:1")
+    except KeyError:
+        print("✅ User 1 successfully deleted")
 
-    # Show final state
-    print("\n📋 Final database state:")
-    results = store.execute("SELECT * FROM users")
-    for row in results:
-        print(f"User {row[0]}: {row[1]} ({row[2]})")
-
-    print("\n✨ Demo completed!")
+    # Clear all data
+    print("\n🧹 Clearing all data...")
+    store.clear()
+    
+    try:
+        store.retrieve("user:2")
+    except KeyError:
+        print("✅ All data successfully cleared")
 
 if __name__ == "__main__":
     main()

@@ -4,22 +4,17 @@ This directory contains demonstration files showcasing the various storage backe
 
 ## Demo Files
 
-1. `01_basic_storage.py` - Basic storage operations 📝
-   - Storage initialization
-   - Basic read/write operations
-   - Error handling
-
-2. `02_hot_storage.py` - Hot storage operations 🔥
+1. `02_hot_storage.py` - Hot storage operations 🔥
    - In-memory caching
    - Performance optimization
    - Cache invalidation
 
-3. `03_cold_storage.py` - Cold storage features ❄️
+2. `03_cold_storage.py` - Cold storage features ❄️
    - Long-term storage
    - Archival operations
    - Data compression
 
-4. `04_mixed_storage.py` - Mixed storage strategies 🔄
+3. `04_mixed_storage.py` - Mixed storage strategies 🔄
    - Hot/Cold tiered storage
    - Automatic data migration
    - Access pattern optimization

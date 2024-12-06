@@ -1,12 +1,34 @@
-"""Session store implementation with expiration and cleanup."""
+"""Session store implementation with expiration, cleanup, and persistence."""
 
+import json
+import logging
 import threading
 import time
 from collections import OrderedDict
 from dataclasses import dataclass, field
-from typing import Any, Optional, Dict, Iterator
+from datetime import datetime
+from enum import Enum
+from pathlib import Path
+from typing import Any, Optional, Dict, Iterator, Union, List
 
 from true_storage.exceptions import StorageError
+
+
+class SessionStatus(Enum):
+    """Session status enumeration."""
+    ACTIVE = "active"
+    EXPIRED = "expired"
+    LOCKED = "locked"
+
+
+@dataclass
+class SessionMetadata:
+    """Metadata for session entries."""
+    created_at: float = field(default_factory=time.time)
+    last_accessed: float = field(default_factory=time.time)
+    access_count: int = 0
+    status: SessionStatus = SessionStatus.ACTIVE
+    lock_expiry: Optional[float] = None
 
 
 @dataclass
@@ -15,53 +37,265 @@ class SessionStoreConfig:
     max_size: int = 1000
     expiration_time: int = 3600  # 1 hour
     cleanup_interval: int = 60  # 1 minute
+    persistence_path: Optional[str] = None  # Path for session persistence
+    backup_interval: int = 300  # 5 minutes
+    max_lock_time: int = 30  # Maximum lock duration in seconds
+    enable_logging: bool = True
+    log_level: int = logging.INFO
 
 
 class SessionStore:
-    """A robust and thread-safe in-memory session store with expiration and LRU eviction."""
+    """A robust and thread-safe in-memory session store with expiration, LRU eviction, and persistence."""
 
     def __init__(self, config: SessionStoreConfig = None):
         self.config = config or SessionStoreConfig()
         self._store: OrderedDict = OrderedDict()
-        self._timestamps: Dict[Any, float] = {}
+        self._metadata: Dict[Any, SessionMetadata] = {}
         self._lock = threading.Lock()
         self._stop_cleanup = threading.Event()
+        
+        # Setup logging
+        if self.config.enable_logging:
+            self._setup_logging()
+        
+        # Start cleanup thread
         self._cleanup_thread = threading.Thread(
             target=self._cleanup_expired_sessions,
             daemon=True
         )
         self._cleanup_thread.start()
+        
+        # Start backup thread if persistence is enabled
+        if self.config.persistence_path:
+            self._stop_backup = threading.Event()
+            self._backup_thread = threading.Thread(
+                target=self._backup_sessions,
+                daemon=True
+            )
+            self._backup_thread.start()
+            self._restore_sessions()
 
-    def set(self, key: Any, value: Any) -> None:
-        """Set a session key to a value with the current timestamp."""
+    def _setup_logging(self) -> None:
+        """Setup logging configuration."""
+        self.logger = logging.getLogger("SessionStore")
+        self.logger.setLevel(self.config.log_level)
+        handler = logging.StreamHandler()
+        formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        )
+        handler.setFormatter(formatter)
+        self.logger.addHandler(handler)
+
+    def set(self, key: Any, value: Any, expiration: Optional[int] = None) -> None:
+        """Set a session key to a value with optional custom expiration."""
         with self._lock:
             try:
                 if len(self._store) >= self.config.max_size:
-                    # Remove oldest item if at capacity
-                    self._store.popitem(last=False)
+                    self._evict_lru_session()
+                
                 timestamp = time.time()
                 self._store[key] = value
-                self._timestamps[key] = timestamp
-                print(f"Set key: {key} with expiration at {timestamp + self.config.expiration_time}")
+                self._metadata[key] = SessionMetadata(
+                    created_at=timestamp,
+                    last_accessed=timestamp
+                )
+                
+                if self.config.enable_logging:
+                    self.logger.info(f"Set key: {key} at {datetime.fromtimestamp(timestamp)}")
             except Exception as e:
+                if self.config.enable_logging:
+                    self.logger.error(f"Failed to set value for key {key}: {e}")
                 raise StorageError(f"Failed to set value: {e}")
 
     def get(self, key: Any, default: Optional[Any] = None) -> Any:
-        """Retrieve a session value by key. Returns default if key is not found or expired."""
+        """Retrieve a session value by key with metadata update."""
         with self._lock:
             try:
                 if key not in self._store:
                     return default
+
+                metadata = self._metadata[key]
+                current_time = time.time()
                 
-                timestamp = self._timestamps[key]
-                if time.time() - timestamp > self.config.expiration_time:
+                # Check lock status
+                if metadata.status == SessionStatus.LOCKED:
+                    if current_time < metadata.lock_expiry:
+                        if self.config.enable_logging:
+                            self.logger.warning(f"Attempted to access locked key: {key}")
+                        raise StorageError(f"Key {key} is locked")
+                    metadata.status = SessionStatus.ACTIVE
+                    metadata.lock_expiry = None
+
+                # Check expiration
+                if current_time - metadata.created_at > self.config.expiration_time:
                     self.delete(key)
                     return default
+
+                # Update metadata
+                metadata.last_accessed = current_time
+                metadata.access_count += 1
                 
-                print(f"Accessed key: {key}")
+                if self.config.enable_logging:
+                    self.logger.debug(f"Accessed key: {key} (access count: {metadata.access_count})")
+                
                 return self._store[key]
             except Exception as e:
+                if self.config.enable_logging:
+                    self.logger.error(f"Failed to get value for key {key}: {e}")
                 raise StorageError(f"Failed to get value: {e}")
+
+    def lock(self, key: Any, duration: Optional[int] = None) -> bool:
+        """Lock a session key for exclusive access."""
+        with self._lock:
+            if key not in self._store:
+                return False
+            
+            lock_time = duration or self.config.max_lock_time
+            metadata = self._metadata[key]
+            metadata.status = SessionStatus.LOCKED
+            metadata.lock_expiry = time.time() + lock_time
+            
+            if self.config.enable_logging:
+                self.logger.info(f"Locked key: {key} for {lock_time} seconds")
+            return True
+
+    def unlock(self, key: Any) -> bool:
+        """Unlock a session key."""
+        with self._lock:
+            if key not in self._store:
+                return False
+            
+            metadata = self._metadata[key]
+            if metadata.status == SessionStatus.LOCKED:
+                metadata.status = SessionStatus.ACTIVE
+                metadata.lock_expiry = None
+                
+                if self.config.enable_logging:
+                    self.logger.info(f"Unlocked key: {key}")
+                return True
+            return False
+
+    def _evict_lru_session(self) -> None:
+        """Evict the least recently used session."""
+        lru_key = min(
+            self._metadata.items(),
+            key=lambda x: x[1].last_accessed
+        )[0]
+        self.delete(lru_key)
+        if self.config.enable_logging:
+            self.logger.info(f"Evicted LRU key: {lru_key}")
+
+    def get_metadata(self, key: Any) -> Optional[SessionMetadata]:
+        """Get metadata for a session key."""
+        with self._lock:
+            return self._metadata.get(key)
+
+    def get_status(self, key: Any) -> Optional[SessionStatus]:
+        """Get the status of a session key."""
+        metadata = self.get_metadata(key)
+        return metadata.status if metadata else None
+
+    def _backup_sessions(self) -> None:
+        """Periodically backup sessions to disk if persistence is enabled."""
+        while not self._stop_backup.is_set():
+            if self.config.persistence_path:
+                try:
+                    self._save_to_disk()
+                    if self.config.enable_logging:
+                        self.logger.info("Sessions backed up successfully")
+                except Exception as e:
+                    if self.config.enable_logging:
+                        self.logger.error(f"Failed to backup sessions: {e}")
+            self._stop_backup.wait(self.config.backup_interval)
+
+    def _save_to_disk(self) -> None:
+        """Save sessions to disk."""
+        if not self.config.persistence_path:
+            return
+            
+        with self._lock:
+            backup_data = {
+                'timestamp': time.time(),
+                'sessions': {
+                    str(key): {
+                        'value': self._store[key],
+                        'metadata': {
+                            'created_at': self._metadata[key].created_at,
+                            'last_accessed': self._metadata[key].last_accessed,
+                            'access_count': self._metadata[key].access_count,
+                            'status': self._metadata[key].status.value,
+                            'lock_expiry': self._metadata[key].lock_expiry
+                        }
+                    }
+                    for key in self._store
+                }
+            }
+            
+            path = Path(self.config.persistence_path)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Write to temporary file first
+            temp_path = path.with_suffix('.tmp')
+            with open(temp_path, 'w') as f:
+                json.dump(backup_data, f)
+            
+            # Atomic rename
+            temp_path.replace(path)
+
+    def _restore_sessions(self) -> None:
+        """Restore sessions from disk on initialization."""
+        if not self.config.persistence_path:
+            return
+            
+        try:
+            path = Path(self.config.persistence_path)
+            if not path.exists():
+                return
+                
+            with open(path, 'r') as f:
+                backup_data = json.load(f)
+                
+            current_time = time.time()
+            for key, data in backup_data['sessions'].items():
+                if current_time - data['metadata']['created_at'] <= self.config.expiration_time:
+                    self._store[key] = data['value']
+                    self._metadata[key] = SessionMetadata(
+                        created_at=data['metadata']['created_at'],
+                        last_accessed=data['metadata']['last_accessed'],
+                        access_count=data['metadata']['access_count'],
+                        status=SessionStatus(data['metadata']['status']),
+                        lock_expiry=data['metadata']['lock_expiry']
+                    )
+            
+            if self.config.enable_logging:
+                self.logger.info(f"Restored {len(self._store)} sessions from disk")
+        except Exception as e:
+            if self.config.enable_logging:
+                self.logger.error(f"Failed to restore sessions: {e}")
+
+    def stop(self) -> None:
+        """Stop all background threads and perform final backup."""
+        self._stop_cleanup.set()
+        if hasattr(self, '_stop_backup'):
+            self._stop_backup.set()
+        
+        if self.config.persistence_path:
+            try:
+                self._save_to_disk()
+            except Exception as e:
+                if self.config.enable_logging:
+                    self.logger.error(f"Failed to perform final backup: {e}")
+        
+        self._cleanup_thread.join()
+        if hasattr(self, '_backup_thread'):
+            self._backup_thread.join()
+        
+        if self.config.enable_logging:
+            self.logger.info("Session store stopped")
+
+    def __del__(self):
+        """Ensure all threads are stopped and final backup is performed."""
+        self.stop()
 
     def delete(self, key: Any) -> bool:
         """Delete a session key. Returns True if the key was deleted, False if not found."""
@@ -69,10 +303,12 @@ class SessionStore:
             try:
                 if key in self._store:
                     del self._store[key]
-                    del self._timestamps[key]
+                    del self._metadata[key]
                     return True
                 return False
             except Exception as e:
+                if self.config.enable_logging:
+                    self.logger.error(f"Failed to delete value for key {key}: {e}")
                 raise StorageError(f"Failed to delete value: {e}")
 
     def clear(self) -> None:
@@ -80,8 +316,10 @@ class SessionStore:
         with self._lock:
             try:
                 self._store.clear()
-                self._timestamps.clear()
+                self._metadata.clear()
             except Exception as e:
+                if self.config.enable_logging:
+                    self.logger.error(f"Failed to clear sessions: {e}")
                 raise StorageError(f"Failed to clear sessions: {e}")
 
     def keys(self) -> Iterator[Any]:
@@ -105,22 +343,12 @@ class SessionStore:
             with self._lock:
                 current_time = time.time()
                 expired_keys = [
-                    key for key, timestamp in self._timestamps.items()
-                    if current_time - timestamp > self.config.expiration_time
+                    key for key, metadata in self._metadata.items()
+                    if current_time - metadata.created_at > self.config.expiration_time
                 ]
                 for key in expired_keys:
                     self.delete(key)
             self._stop_cleanup.wait(self.config.cleanup_interval)
-
-    def stop_cleanup(self) -> None:
-        """Stop the background cleanup thread."""
-        self._stop_cleanup.set()
-        self._cleanup_thread.join()
-        print("Cleanup thread stopped.")
-
-    def __del__(self):
-        """Ensure the cleanup thread is stopped when the instance is deleted."""
-        self.stop_cleanup()
 
     def __setitem__(self, key: Any, value: Any) -> None:
         """Enable dict-like setting of items."""
@@ -147,8 +375,8 @@ class SessionStore:
         with self._lock:
             current_time = time.time()
             return sum(
-                1 for timestamp in self._timestamps.values()
-                if current_time - timestamp <= self.config.expiration_time
+                1 for metadata in self._metadata.values()
+                if current_time - metadata.created_at <= self.config.expiration_time
             )
 
     def __repr__(self) -> str:
@@ -161,9 +389,9 @@ class SessionStore:
         if not isinstance(other, SessionStore):
             return NotImplemented
         return (
-            self.config.max_size == other.config.max_size and
-            self.config.expiration_time == other.config.expiration_time and
-            self._store == other._store
+                self.config.max_size == other.config.max_size and
+                self.config.expiration_time == other.config.expiration_time and
+                self._store == other._store
         )
 
     def __le__(self, other: Any) -> bool:

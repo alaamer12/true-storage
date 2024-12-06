@@ -1,174 +1,135 @@
-# True-storage Python Library
+# 🚀 True Storage
 
-A sophisticated Python utility library providing advanced enum management, type validation, time handling, regular expressions, and file operations.
+[![PyPI version](https://badge.fury.io/py/true-storage.svg)](https://badge.fury.io/py/true-storage)
+[![Documentation Status](https://readthedocs.org/projects/true-storage/badge/?version=latest)](https://true-storage.readthedocs.io/en/latest/?badge=latest)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## storage Components
+A comprehensive Python library for advanced storage management, environment configuration, and session handling.
 
-### 1. Enum Management (`true.enum_registry`)
+## ✨ Features
 
-- **EnumRegistry**: Advanced enum combination and management
-  - Merge multiple enum classes into a single registry
-  - Type-safe operations and validation
-  - Metadata support with descriptions, tags, and timestamps
-  - Comprehensive filtering capabilities
-  - Statistical analysis and serialization
+### 🌍 Advanced Environment Management
+- 📁 Multiple environment sources (env files, JSON, config files)
+- 🔐 Environment validation and type checking
+- 🔄 Mode-specific variables (dev, test, stage, prod)
+- ⚡ Variable interpolation
+- 📸 Environment snapshots and rollback
+- 🔌 Optional Pydantic integration
 
-### 2. Enum Toolkits (`true.enums_toolkits`)
+### 🔄 Session Management
+- 🔒 Thread-safe in-memory session store
+- ⏰ Automatic expiration and cleanup
+- 📊 LRU eviction strategy
+- ⚙️ Configurable size and timeout
 
-- **Specialized Enum Classes**:
-  - `DynamicEnum`: Runtime-modifiable enums
-  - Type-safe enums: `ByteEnum`, `FloatEnum`, `ComplexNumberEnum`
-  - Collection enums: `DictEnum`, `SetEnum`, `ListEnum`, `TupleEnum`
-  - Iterator enums: `IterableEnum`, `IteratorEnum`, `GeneratorEnum`
-- **Metadata Support**:
-  - Custom attribute configuration
-  - Type information tracking
-  - Serialization capabilities
+### 💾 Storage Solutions
+- 🔥 Hot storage for frequently accessed data
+- ❄️ Cold storage for archival data
+- 🔄 Mixed storage strategy
+- 🛠️ Base storage interface for custom implementations
 
-### 3. Collections (`true.collections`)
+### 🗄️ Database Integration
+- 🔒 Thread-safe database implementations
+- 📁 Filesystem storage with atomic operations
+- 📦 Redis support with connection pooling
+- 🎲 SQLite with BLOB storage optimization
+- 🔄 Pickle-based serialization
+- 🏷️ Customizable key prefixing
+- ⚠️ Error handling and connection management
 
-- **File System Operations**:
-  - Secure file deletion and creation
-  - Advanced file metadata handling
-  - Cross-platform compatibility
-  - File type-specific operations
-- **File Management**:
-  - RecycleBin with metadata tracking
-  - Batch file operations
-  - Directory watching
-  - File statistics and analysis
-
-### 4. Time Management (`true.time`)
-
-- **Time Handling**:
-  - Advanced timezone support
-  - Time arithmetic and comparisons
-  - Duration calculations
-  - Event scheduling
-- **Time Features**:
-  - Time rounding and formatting
-  - Timezone conversions
-  - Performance timing decorators
-  - Schedule management with conflict detection
-
-### 5. Regular Expressions (`true.re`)
-
-- **Validation Patterns**:
-  - Username validation patterns
-  - Password complexity patterns
-  - Email format validation
-  - Phone number formats
-  - Credit card validation
-  - URL pattern matching
-  - Date format validation
-  - IP address validation
-
-### 6. Type System (`true.types`)
-
-- **Version Types**:
-  - SemVer, CalVer, DateVersion support
-  - Version validation and comparison
-- **Numeric Types**:
-  - `BigInt` and `BigDecimal` with validation
-  - Scientific number handling
-  - Validated numeric types
-- **ID Types**:
-  - UUID/ULID support with versions
-  - String and integer-based IDs
-- **Serialization**:
-  - JSON, YAML, TOML support
-  - Type conversion utilities
-
-### 7. Exception Handling (`true.exceptions`)
-
-- **Specialized Exceptions**:
-  - Enum-related exceptions
-  - Type validation errors
-  - Schedule management errors
-  - File operation errors
-  - Access control exceptions
-  - Configuration errors
-
-## Installation
+## 🚀 Installation
 
 ```bash
+# Basic installation
 pip install true-storage
+
+# With Pydantic support
+pip install true-storage[pydantic]
 ```
 
-## Quick Start
+## 📚 Quick Start
+
+### 🌍 Environment Management
 
 ```python
-from true.enum_registry import EnumRegistry
-from true.collections import OSUtils
-from true.time import Time, Schedule, Event, TimeUnit
-from true.types import BigInt, Version
-from enum import Enum
+from true_storage.env import Environment, MODES
 
-# Enum Registry Example
-class ColorEnum(Enum):
-    RED = 1
-    BLUE = 2
+# Initialize environment
+env = Environment(env_data=".env")
 
-registry = EnumRegistry([ColorEnum])
-int_values = registry.filter.by_value_type(int)
+# Set mode-specific variables
+env.set('API_KEY', 'secret-key', modes=[MODES.PROD])
+env.set('DEBUG', 'true', modes=[MODES.DEV])
 
-# Time Management Example
-time = Time.now()
-schedule = Schedule()
-event = Event(name="Meeting", start_time=time, end_time=time.add(1, TimeUnit.HOURS))
-schedule.add_event(event)
-
-# Type Validation Example
-version = Version("1.2.3")
-big_num = BigInt(1000000, context="Positive")
-
-# File Operations Example
-utils = OSUtils()
-utils.force_delete("path/to/file")  # Secure deletion
-utils.watch_directory("path/to/dir", callback=lambda event: print(f"Change: {event.src_path}"))
+# Access variables with mode context
+with env.with_mode(MODES.PROD):
+    api_key = env.get('API_KEY')  # Only accessible in PROD mode
 ```
 
-## Requirements
+### 🔄 Session Management
 
-- Python 3.8+
-- Platform-specific dependencies:
-  - Windows: `pywin32` for advanced file operations
-  - Unix: Standard Python libraries
-- Optional dependencies:
-  - `pytz` for timezone support
-  - `pydub` for audio file handling
-  - `Pillow` for image processing
+```python
+from true_storage.session import SessionStore, SessionStoreConfig
 
-## Documentation
+# Configure session store
+config = SessionStoreConfig(
+    max_size=1000,
+    expiration_time=3600,  # 1 hour
+    cleanup_interval=60    # 1 minute
+)
 
-For detailed documentation, see [docs](https://true-storage.readthedocs.io/en/latest/).
+# Initialize session store
+store = SessionStore(config)
 
-## License
+# Use session store
+store.set('user_id', 'user123')
+user_id = store.get('user_id')
+```
 
-MIT License - See LICENSE file for details.
+### 💾 Storage Management
 
-## Contributing
+```python
+from true_storage.storage.hot import HotStorage
+from true_storage.storage.cold import ColdStorage
+from true_storage.storage.mixed import MixedStorage
 
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
+# Initialize storage
+hot_storage = HotStorage()
+cold_storage = ColdStorage()
+mixed_storage = MixedStorage()
 
-## Support
+# Store and retrieve data
+mixed_storage.store('key', 'value')
+value = mixed_storage.retrieve('key')
+```
 
-For support:
+### 🗄️ Database Integration
 
-1. Check the documentation
-2. Search existing issues
-3. Create a new issue if needed
+```python
+# File System Storage
+from true_storage.database import FileSystemStorage
+fs_storage = FileSystemStorage(base_dir="/path/to/storage")
+fs_storage.store("key", {"data": "value"})
 
-## Author
+# Redis Storage
+from true_storage.database import RedisStorage
+redis_storage = RedisStorage(host="localhost", port=6379, prefix="app:")
+redis_storage.store("key", ["list", "of", "items"])
 
-Alaamer - https://github.com/alaamer12
+# SQLite Storage
+from true_storage.database import SQLiteStorage
+sqlite_storage = SQLiteStorage(db_path="app.db")
+sqlite_storage.store("key", {"complex": "data"})
+```
 
-## Acknowledgments
+## 📖 Documentation
 
-- [PyPI](https://pypi.org/project/true-storage/)
-- [GitHub](https://github.com/alaamer12/true-storage)
-- [Python](https://www.python.org/)
+For detailed documentation, visit [true-storage.readthedocs.io](https://true-storage.readthedocs.io/).
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE.txt) file for details.

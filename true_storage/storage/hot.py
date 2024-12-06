@@ -1,84 +1,194 @@
-"""Hot storage implementation with LRU cache."""
+"""Hot storage implementation with LRU cache and advanced features."""
 
 import threading
 import time
 from collections import OrderedDict
-from typing import Any
+from typing import Any, Optional, Dict
 
-from ..base import BaseStorage
+from .base import (
+    BaseStorageManager,
+    StoragePolicy,
+    StorageStrategy,
+    StorageOptimizer
+)
 from ..exceptions import StorageError
 
 
-class HotStorage(BaseStorage):
-    """Hot storage implementation with LRU cache."""
+class LRUOptimizer(StorageOptimizer):
+    """Optimizer for LRU cache data."""
 
-    def __init__(self, max_size=100, expiration_time=300):
-        self.data = OrderedDict()  # Maintains insertion order
+    def optimize(self, data: Any) -> Any:
+        """Optimize data for storage."""
+        # Add optimization logic here if needed
+        return data
+
+    def deoptimize(self, data: Any) -> Any:
+        """Restore data from optimized form."""
+        # Add deoptimization logic here if needed
+        return data
+
+
+class LRUStrategy(StorageStrategy):
+    """LRU cache implementation strategy."""
+
+    def __init__(self, max_size: int):
+        self.data: OrderedDict = OrderedDict()
         self.max_size = max_size
-        self.expiration_time = expiration_time  # Time in seconds
-        self.lock = threading.Lock()  # For thread-safe access
-        self._timestamps = {}  # Store timestamps for each key
+        self.lock = threading.Lock()
 
-    def _remove_expired_items(self):
+    def store(self, key: str, value: Any) -> None:
+        """Store a value using LRU strategy."""
+        with self.lock:
+            if key in self.data:
+                del self.data[key]
+            elif len(self.data) >= self.max_size:
+                self.data.popitem(last=False)
+            self.data[key] = value
+
+    def retrieve(self, key: str) -> Optional[Any]:
+        """Retrieve a value using LRU strategy."""
+        with self.lock:
+            if key not in self.data:
+                return None
+            value = self.data.pop(key)
+            self.data[key] = value
+            return value
+
+    def delete(self, key: str) -> None:
+        """Delete a value using LRU strategy."""
+        with self.lock:
+            if key in self.data:
+                del self.data[key]
+
+
+class HotStorage(BaseStorageManager):
+    """Hot storage implementation with LRU cache and advanced features."""
+
+    def __init__(
+            self,
+            storage_id: str = "hot_storage",
+            max_size: int = 100,
+            expiration_time: int = 300,
+            policy: StoragePolicy = StoragePolicy.STRICT
+    ):
+        super().__init__(
+            storage_id=storage_id,
+            policy=policy,
+            optimizer=LRUOptimizer()
+        )
+        self.expiration_time = expiration_time
+        self.strategy = LRUStrategy(max_size)
+        self._timestamps: Dict[str, float] = {}
+
+    def _is_expired(self, key: str) -> bool:
+        """Check if a key has expired."""
+        timestamp = self._timestamps.get(key)
+        if timestamp is None:
+            return True
+        return time.time() - timestamp > self.expiration_time
+
+    def _remove_expired_items(self) -> None:
         """Remove expired items from storage."""
-        current_time = time.time()
         expired_keys = [
-            key for key, timestamp in self._timestamps.items()
-            if current_time - timestamp > self.expiration_time
+            key for key in list(self._timestamps.keys())
+            if self._is_expired(key)
         ]
         for key in expired_keys:
             self.delete(key)
+            self.emit_event("item_expired", {"key": key})
 
     def store(self, key: str, value: Any) -> None:
-        with self.lock:
-            try:
-                self._remove_expired_items()
-                if key in self.data:
-                    del self.data[key]
-                elif len(self.data) >= self.max_size:
-                    self.data.popitem(last=False)  # Remove oldest item
-                self.data[key] = value
-                self._timestamps[key] = time.time()
-            except Exception as e:
+        """Store a value in hot storage."""
+        start_time = time.time()
+        success = True
+        try:
+            self._remove_expired_items()
+            optimized_value = self.optimize_data(value)
+            self.strategy.store(key, optimized_value)
+            self._timestamps[key] = time.time()
+            self.emit_event("item_stored", {"key": key})
+            self._trigger_callbacks("after_store", key, value)
+        except Exception as e:
+            success = False
+            if self.policy == StoragePolicy.STRICT:
                 raise StorageError(f"Failed to store value: {e}")
+        finally:
+            self.update_metrics("store", success, time.time() - start_time)
 
-    def retrieve(self, key: str) -> Any:
-        with self.lock:
-            try:
-                self._remove_expired_items()
-                if key not in self.data:
-                    return None
-                value = self.data.pop(key)  # Remove and re-add to maintain LRU order
-                self.data[key] = value
-                self._timestamps[key] = time.time()  # Update timestamp
-                return value
-            except Exception as e:
+    def retrieve(self, key: str) -> Optional[Any]:
+        """Retrieve a value from hot storage."""
+        start_time = time.time()
+        success = True
+        try:
+            self._remove_expired_items()
+            if self._is_expired(key):
+                self.delete(key)
+                return None
+
+            value = self.strategy.retrieve(key)
+            if value is not None:
+                value = self.deoptimize_data(value)
+                self._timestamps[key] = time.time()  # Update access time
+                self.emit_event("item_retrieved", {"key": key})
+                self._trigger_callbacks("after_retrieve", key, value)
+            return value
+        except Exception as e:
+            success = False
+            if self.policy == StoragePolicy.STRICT:
                 raise StorageError(f"Failed to retrieve value: {e}")
+            return None
+        finally:
+            self.update_metrics("retrieve", success, time.time() - start_time)
 
     def delete(self, key: str) -> None:
-        with self.lock:
-            try:
-                if key in self.data:
-                    del self.data[key]
-                    del self._timestamps[key]
-            except Exception as e:
+        """Delete a value from hot storage."""
+        start_time = time.time()
+        success = True
+        try:
+            self.strategy.delete(key)
+            self._timestamps.pop(key, None)
+            self.emit_event("item_deleted", {"key": key})
+            self._trigger_callbacks("after_delete", key)
+        except Exception as e:
+            success = False
+            if self.policy == StoragePolicy.STRICT:
                 raise StorageError(f"Failed to delete value: {e}")
+        finally:
+            self.update_metrics("delete", success, time.time() - start_time)
 
     def clear(self) -> None:
-        with self.lock:
-            try:
-                self.data.clear()
-                self._timestamps.clear()
-            except Exception as e:
+        """Clear all items from hot storage."""
+        start_time = time.time()
+        success = True
+        try:
+            self.strategy = LRUStrategy(self.strategy.max_size)
+            self._timestamps.clear()
+            self.emit_event("storage_cleared")
+            self._trigger_callbacks("after_clear")
+        except Exception as e:
+            success = False
+            if self.policy == StoragePolicy.STRICT:
                 raise StorageError(f"Failed to clear storage: {e}")
+        finally:
+            self.update_metrics("clear", success, time.time() - start_time)
 
-    def clone(self) -> 'HotStorage':
-        new_storage = HotStorage(self.max_size, self.expiration_time)
-        with self.lock:
-            try:
-                new_storage.data = OrderedDict(self.data)
-                new_storage._timestamps = dict(self._timestamps)
-                return new_storage
-            except Exception as e:
-                new_storage.clear()
-                raise StorageError(f"Failed to clone storage: {e}")
+    def get_size(self) -> int:
+        """Get the current size of hot storage."""
+        return len(self._timestamps)
+
+    def get_keys(self) -> list[str]:
+        """Get all non-expired keys in hot storage."""
+        self._remove_expired_items()
+        return list(self._timestamps.keys())
+
+    def get_stats(self) -> Dict[str, Any]:
+        """Get storage statistics."""
+        metrics = self.get_metrics()
+        return {
+            "size": self.get_size(),
+            "max_size": self.strategy.max_size,
+            "hit_ratio": metrics.hits / (metrics.hits + metrics.misses) if metrics.hits + metrics.misses > 0 else 0,
+            "avg_response_time": metrics.avg_response_time,
+            "total_operations": metrics.total_operations,
+            "total_errors": metrics.total_errors
+        }

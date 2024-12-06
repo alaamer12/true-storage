@@ -1,10 +1,10 @@
 Environment Examples
-===================
+====================
 
 This section contains examples demonstrating the environment management capabilities of True Storage.
 
 Basic Environment Usage
---------------------
+-----------------------
 
 The following example shows basic environment variable handling:
 
@@ -21,7 +21,7 @@ Key features demonstrated:
  - Default values
 
 Mode-Specific Configuration
--------------------------
+---------------------------
 
 This example demonstrates mode-specific environment configurations:
 
@@ -38,7 +38,7 @@ Key features demonstrated:
  - Configuration overrides
 
 Environment Snapshots
-------------------
+---------------------
 
 The following example shows how to work with environment snapshots:
 
@@ -55,7 +55,7 @@ Key features demonstrated:
  - State management
 
 Advanced Environment Features
--------------------------
+-----------------------------
 
 This example demonstrates advanced environment management features:
 

@@ -1,8 +1,6 @@
-import os
 import sys
 import re
 import argparse
-from datetime import date
 from pathlib import Path
 from typing import Dict, List, Optional
 

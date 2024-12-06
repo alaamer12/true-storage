@@ -6,10 +6,9 @@ which combines hot and cold storage for optimal performance and storage efficien
 """
 
 import logging
-import json
 import time
 import tempfile
-from datetime import datetime, timedelta
+from datetime import datetime
 from true_storage.storage.mixed import MixedStorage
 
 def format_size(size_bytes):

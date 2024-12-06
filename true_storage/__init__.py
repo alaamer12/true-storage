@@ -6,7 +6,6 @@ A comprehensive utility toolkit designed for Python developers
 seeking clean, efficient, and maintainable solutions.
 """
 
-
 __title__ = "true-storage"
 __version__ = "0.1.0"
 __author__ = "alaamer12"
@@ -47,6 +46,7 @@ def get_author() -> str:
 def get_description() -> str:
     """Return the description of true."""
     return __description__
+
 
 def __dir__():
     """Return a sorted list of names in this module."""

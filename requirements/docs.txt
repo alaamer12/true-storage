@@ -3,3 +3,5 @@ sphinx-rtd-theme
 sphinx-autodoc-typehints
 myst-parser
 sphinx-rtd-dark-mode
+sphinx-copybutton
+sphinx-design

@@ -19,11 +19,6 @@ This directory contains demonstration files showcasing the various database back
    - Key-value operations
    - Caching and expiration
 
-4. `04_advanced_queries.py` - Advanced database operations 🔍
-   - Complex queries
-   - Transactions
-   - Indexing and optimization
-
 ## Usage
 
 Each demo file can be run independently. Make sure you have the required dependencies installed:

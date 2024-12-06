@@ -1,7 +1,7 @@
 """Database storage implementations."""
 
-from .sqlite import SQLiteStorage
+from .filesystem import FileSystemStorage
 from .redis_store import RedisStorage
-from filesystem import FileSystemStorage
+from .sqlite import SQLiteStorage
 
 __all__ = ['SQLiteStorage', 'RedisStorage', 'FileSystemStorage']

@@ -3,11 +3,11 @@
 import abc
 import enum
 import time
-import typing
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Callable, TypeVar, Generic
 
 T = TypeVar('T')
+
 
 class StoragePolicy(enum.Enum):
     """Storage policies for data management."""
@@ -30,6 +30,7 @@ class StorageMetrics:
 
 class StorageEvent:
     """Base class for storage events."""
+
     def __init__(self, storage_id: str, event_type: str, data: Any = None):
         self.storage_id = storage_id
         self.event_type = event_type
@@ -39,7 +40,7 @@ class StorageEvent:
 
 class StorageEventHandler(abc.ABC):
     """Abstract base class for storage event handlers."""
-    
+
     @abc.abstractmethod
     def handle_event(self, event: StorageEvent) -> None:
         """Handle a storage event."""
@@ -48,7 +49,7 @@ class StorageEventHandler(abc.ABC):
 
 class StorageOptimizer(abc.ABC):
     """Abstract base class for storage optimizers."""
-    
+
     @abc.abstractmethod
     def optimize(self, data: Any) -> Any:
         """Optimize data for storage."""
@@ -62,7 +63,7 @@ class StorageOptimizer(abc.ABC):
 
 class StorageStrategy(abc.ABC, Generic[T]):
     """Abstract base class for storage strategies."""
-    
+
     @abc.abstractmethod
     def store(self, key: str, value: T) -> None:
         """Store a value."""
@@ -83,11 +84,11 @@ class BaseStorageManager:
     """Base class for storage management."""
 
     def __init__(
-        self,
-        storage_id: str,
-        policy: StoragePolicy = StoragePolicy.STRICT,
-        event_handlers: Optional[List[StorageEventHandler]] = None,
-        optimizer: Optional[StorageOptimizer] = None
+            self,
+            storage_id: str,
+            policy: StoragePolicy = StoragePolicy.STRICT,
+            event_handlers: Optional[List[StorageEventHandler]] = None,
+            optimizer: Optional[StorageOptimizer] = None
     ):
         self.storage_id = storage_id
         self.policy = policy
@@ -137,8 +138,8 @@ class BaseStorageManager:
             self.metrics.total_errors += 1
         # Update average response time using moving average
         self.metrics.avg_response_time = (
-            (self.metrics.avg_response_time * (self.metrics.total_operations - 1) + response_time)
-            / self.metrics.total_operations
+                (self.metrics.avg_response_time * (self.metrics.total_operations - 1) + response_time)
+                / self.metrics.total_operations
         )
 
     def get_metrics(self) -> StorageMetrics:

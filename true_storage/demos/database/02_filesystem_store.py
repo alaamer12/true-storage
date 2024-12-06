@@ -4,12 +4,11 @@ Filesystem Store Demo
 This demo shows operations with the filesystem-based storage backend.
 """
 
-import os
 import json
 import tempfile
 import logging
 from pathlib import Path
-from true_storage.database.filesystem import FileSystemStore
+from true_storage.database import FileSystemStorage
 
 def main():
     # Configure logging
@@ -20,11 +19,11 @@ def main():
 
     # Create a temporary directory for demonstration
     with tempfile.TemporaryDirectory() as temp_dir:
-        print(f"🚀 Initializing FileSystem Store in {temp_dir}...")
-        store = FileSystemStore(temp_dir)
+        print(f"\nInitializing FileSystem Store in {temp_dir}...")
+        store = FileSystemStorage(temp_dir)
 
         # Store some data
-        print("\n💾 Storing data...")
+        print("\nStoring data...")
         data = {
             "config": {
                 "app_name": "Demo App",
@@ -41,61 +40,47 @@ def main():
         }
 
         # Store data in different paths
-        print("\n📁 Creating directory structure...")
-        store.store("config/app.json", json.dumps(data["config"]))
-        store.store("data/users.json", json.dumps(data["users"]))
-
-        # List directory contents
-        print("\n📋 Directory structure:")
-        def print_tree(path, prefix=""):
-            path_obj = Path(temp_dir) / path
-            if path_obj.is_file():
-                size = path_obj.stat().st_size
-                print(f"{prefix}📄 {path_obj.name} ({size} bytes)")
-            else:
-                print(f"{prefix}📁 {path_obj.name}/")
-                for child in path_obj.iterdir():
-                    print_tree(child.relative_to(Path(temp_dir)), prefix + "  ")
-
-        print_tree("")
+        print("\nCreating directory structure...")
+        store.store("config/app.json", data["config"])  # Store Python dict directly
+        store.store("data/users.json", data["users"])   # Store Python list directly
 
         # Read data back
-        print("\n📖 Reading configuration...")
-        config = json.loads(store.retrieve("config/app.json"))
+        print("\nReading configuration...")
+        config = store.retrieve("config/app.json")  # Retrieved as Python dict
         print("App Configuration:")
         print(f"  Name: {config['app_name']}")
         print(f"  Version: {config['version']}")
         print(f"  Debug Mode: {config['settings']['debug']}")
 
-        print("\n👥 Reading users...")
-        users = json.loads(store.retrieve("data/users.json"))
+        print("\nReading users...")
+        users = store.retrieve("data/users.json")  # Retrieved as Python list
         for user in users:
             print(f"  User {user['id']}: {user['name']} ({user['role']})")
 
         # Update data
-        print("\n✏️ Updating configuration...")
+        print("\nUpdating configuration...")
         config["settings"]["debug"] = False
-        store.store("config/app.json", json.dumps(config))
+        store.store("config/app.json", config)
 
         # Verify update
-        print("\n🔍 Verifying update...")
-        updated_config = json.loads(store.retrieve("config/app.json"))
+        print("\nVerifying update...")
+        updated_config = store.retrieve("config/app.json")
         print(f"Debug Mode is now: {updated_config['settings']['debug']}")
 
         # Delete data
-        print("\n❌ Deleting user data...")
+        print("\nDeleting user data...")
         store.delete("data/users.json")
 
         # Check existence
-        print("\n✨ Checking file existence:")
+        print("\nChecking file existence:")
         files = ["config/app.json", "data/users.json"]
         for file in files:
             exists = store.exists(file)
-            print(f"  {file}: {'✅ Exists' if exists else '❌ Not found'}")
+            print(f"  {file}: {'Exists' if exists else 'Not found'}")
 
-        print("\n🧹 Cleanup will happen automatically when exiting the context")
+        print("\nCleanup will happen automatically when exiting the context")
 
-    print("\n✨ Demo completed!")
+    print("\nDemo completed!")
 
 if __name__ == "__main__":
     main()

@@ -5,7 +5,6 @@ from true_storage.session import (
 from true_storage.storage import (
     ColdStorage,
     HotStorage,
-    MixedStorage,
 )
 from true_storage.database import (
     FileSystemStorage,

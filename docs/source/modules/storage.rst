@@ -6,7 +6,7 @@ Storage Module
 The Storage module provides different storage implementations for data management, including hot, cold, and mixed storage strategies.
 
 Base Storage
------------
+------------
 
 .. automodule:: true_storage.storage.base
    :members:
@@ -14,7 +14,7 @@ Base Storage
    :show-inheritance:
 
 Hot Storage
-----------
+-----------
 
 .. automodule:: true_storage.storage.hot
    :members:
@@ -22,7 +22,7 @@ Hot Storage
    :show-inheritance:
 
 Cold Storage
------------
+------------
 
 .. automodule:: true_storage.storage.cold
    :members:
@@ -30,7 +30,7 @@ Cold Storage
    :show-inheritance:
 
 Mixed Storage
-------------
+-------------
 
 .. automodule:: true_storage.storage.mixed
    :members:

@@ -1,10 +1,10 @@
 Database Examples
-================
+=================
 
 This section contains examples demonstrating the database storage capabilities of True Storage.
 
 Basic SQLite Storage
-------------------
+--------------------
 
 The following example demonstrates basic operations with SQLite storage:
 
@@ -22,7 +22,7 @@ Key features demonstrated:
  - Error handling
 
 Filesystem Storage
-----------------
+------------------
 
 The following example shows how to use filesystem-based storage:
 

@@ -1,65 +1,25 @@
-0.1.0 Changelog
-===============
+Changelog
+=========
 
-Added
------
-* Initial implementation of storage backends
-  - Hot Storage (in-memory with LRU)
-  - Cold Storage (disk-based)
-  - Mixed Storage (tiered)
-  - SQLite Storage
-  - Filesystem Storage
+Version 0.1.0 (2024-01-15)
+--------------------------
 
-* Session management system
-  - Basic CRUD operations
-  - Expiration handling
-  - Thread safety
-  - Persistence
-  - Advanced features
+Initial release of True Storage with the following features:
 
-* Environment management
-  - Variable handling
-  - Mode-specific configs
-  - Snapshots
-  - Validation
+Features
+~~~~~~~~
+* Advanced environment management system
+* Mode-based configuration (dev, test, stage, prod)
+* Secure secret management
+* Variable validation and type checking
+* Environment inheritance
+* Variable interpolation
+* Snapshot and rollback capabilities
+* Pydantic integration
 
-* Core functionality
-  - Thread safety
-  - Atomic operations
-  - Compression support
-  - Performance monitoring
-  - Type hints
-
-* Integration support
-  - Pydantic v1/v2
-  - SQLite
-  - Custom serializers
-
-* Documentation
-  - API reference
-  - Usage examples
-  - Installation guides
-  - Best practices
-
-Changed
--------
-* Initial release - no changes
-
-Deprecated
-----------
-* Initial release - no deprecations
-
-Removed
--------
-* Initial release - no removals
-
-Fixed
------
-* Initial release - no fixes
-
-Security
---------
-* Initial release - basic security features implemented
-* Atomic file operations
-* Thread-safe implementations
-* Secure temporary file handling
+Documentation
+~~~~~~~~~~~~~
+* Comprehensive API reference
+* Detailed examples
+* Installation guide
+* Troubleshooting guide

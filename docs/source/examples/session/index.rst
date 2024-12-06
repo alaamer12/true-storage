@@ -1,10 +1,10 @@
 Session Examples
-===============
+================
 
 This section contains examples demonstrating the session management capabilities of True Storage.
 
 Basic Session Usage
-----------------
+-------------------
 
 The following example shows basic session operations:
 
@@ -21,7 +21,7 @@ Key features demonstrated:
  - Basic error handling
 
 Session Expiration
----------------
+------------------
 
 This example demonstrates session expiration handling:
 
@@ -38,7 +38,7 @@ Key features demonstrated:
  - Time-based operations
 
 Session Locking
-------------
+---------------
 
 The following example shows thread-safe session operations:
 
@@ -55,7 +55,7 @@ Key features demonstrated:
  - Concurrent access
 
 Session Persistence
----------------
+-------------------
 
 This example demonstrates session persistence features:
 
@@ -72,7 +72,7 @@ Key features demonstrated:
  - Backend configuration
 
 Advanced Session Features
----------------------
+-------------------------
 
 This example shows advanced session management features:
 
