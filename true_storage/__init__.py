@@ -7,7 +7,7 @@ seeking clean, efficient, and maintainable solutions.
 """
 
 
-__title__ = "true"
+__title__ = "true-storage"
 __version__ = "0.1.0"
 __author__ = "alaamer12"
 __author_email__ = "ahmedmuhmmed239@gmail.com"

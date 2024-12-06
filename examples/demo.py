@@ -1,12 +1,15 @@
-from true_storage.store import (
-    FileSystemStorage,
-    SQLiteStorage,
-    RedisStorage,
+from true_storage.session import (
+    SessionStore,
+    SessionStoreConfig
+)
+from true_storage.storage import (
     ColdStorage,
     HotStorage,
     MixedStorage,
-    SessionStore,
-    SessionStoreConfig
+)
+from true_storage.database import (
+    FileSystemStorage,
+    SQLiteStorage,
 )
 
 def demo_filesystem_storage():
