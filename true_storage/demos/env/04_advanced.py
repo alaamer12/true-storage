@@ -1,105 +1,107 @@
 """Advanced environment management features demo.
 
-This demo shows advanced functionality:
-- Custom mode creation
-- Variable filtering
-- Mode inheritance
-- Complex mode-based operations
+This demo shows advanced features like validation, filtering, and inheritance.
 """
 
-from true_storage.env import Environment, MODES
-
+from true_storage.env import Environment, MODES, EnvValidator
 
 def main():
-    """Demonstrate advanced environment functionality."""
+    """Run the advanced environment features demo."""
     print("\n=== Advanced Environment Features Demo ===\n")
 
-    env = Environment()
+    print("1. Environment Validation")
+    print("----------------------")
+    # Create environment with validation
+    schema = {
+        'PORT': int,
+        'DEBUG': bool,
+        'API_URL': str,
+        'MAX_CONNECTIONS': int
+    }
+    env = Environment(validator=EnvValidator(schema))
 
-    # 1. Custom mode creation
-    print("1. Custom Modes")
-    print("   ------------")
-    # Set variable in STAGE mode
-    env.set('STAGE_URL', 'stage.example.com', modes=[MODES.STAGE])
-    # Only show public modes (exclude those starting with _)
-    available_modes = [mode.name for mode in MODES if not mode.name.startswith('_')]
-    print(f"   Available Modes: {available_modes}")
+    # Set valid values
+    env.set({
+        'PORT': '8080',           # Will be converted to int
+        'DEBUG': 'true',          # Will be converted to bool
+        'API_URL': 'http://api',  # Stays as string
+        'MAX_CONNECTIONS': '100'  # Will be converted to int
+    })
 
-    # Switch to STAGE mode to access the variable
-    env.mode = MODES.STAGE
-    print(f"   Current Mode: {env.mode}")
-    print(f"   STAGE_URL: {env.get('STAGE_URL')}")
+    print("Valid values set successfully:")
+    print(f"  PORT: {env.get('PORT')} (type: {type(env.get('PORT'))})")
+    print(f"  DEBUG: {env.get('DEBUG')} (type: {type(env.get('DEBUG'))})")
+    print(f"  API_URL: {env.get('API_URL')} (type: {type(env.get('API_URL'))})")
+    print(f"  MAX_CONNECTIONS: {env.get('MAX_CONNECTIONS')} (type: {type(env.get('MAX_CONNECTIONS'))})")
 
-    # Switch back to DEV mode
-    env.mode = MODES.DEV
+    # Try setting invalid values
+    print("\nTrying to set invalid values:")
+    try:
+        env.set({'PORT': 'invalid_port'})  # Should fail validation
+    except Exception as e:
+        print(f"  PORT validation failed (expected): {e}")
 
-    # 2. Variable filtering
-    print("\n2. Variable Filtering")
-    print("   -----------------")
+    print("\n2. Environment Inheritance")
+    print("-----------------------")
+    # Create parent environment
+    parent_env = Environment()
+    parent_env.set({
+        'PARENT_VAR': 'parent_value',
+        'SHARED_VAR': 'parent_version'
+    })
 
-    # Set up some variables
-    env.set('DB_HOST', 'localhost', modes=[MODES.DEV])
-    env.set('DB_PORT', '5432', modes=[MODES.DEV])
-    env.set('DB_NAME', 'myapp', modes=[MODES.DEV])
-    env.set('API_HOST', 'api.example.com', modes=[MODES.DEV])
+    # Create child environment
+    child_env = Environment(parent=parent_env)
+    child_env.set({'CHILD_VAR': 'child_value'})
+    child_env.set({'SHARED_VAR': 'child_version'})  # Override parent
 
-    # Filter DB-related variables
-    db_vars = {k: v for k, v in env.variables.items() if 'DB_' in k}
-    print("   DB-related variables:")
+    print("Parent environment:")
+    print(f"  PARENT_VAR: {parent_env.get('PARENT_VAR')}")
+    print(f"  SHARED_VAR: {parent_env.get('SHARED_VAR')}")
+
+    print("\nChild environment:")
+    print(f"  PARENT_VAR: {child_env.get('PARENT_VAR')}") # Inherited
+    print(f"  CHILD_VAR: {child_env.get('CHILD_VAR')}")   # Own variable
+    print(f"  SHARED_VAR: {child_env.get('SHARED_VAR')}")  # Overridden
+
+    print("\n3. Variable Filtering")
+    print("------------------")
+    # Set some variables for filtering
+    env.set({
+        'DB_HOST': 'localhost',
+        'DB_PORT': '5432',
+        'DB_NAME': 'mydb',
+        'API_KEY': 'secret',
+        'API_VERSION': 'v1'
+    })
+
+    # Filter by prefix
+    db_vars = env.filter('DB_')
+    api_vars = env.filter('API_')
+
+    print("Database-related variables:")
     for key, value in db_vars.items():
-        print(f"   - {key}: {value}")
+        print(f"  {key}: {value}")
 
-    # 3. Mode-specific operations
-    print("\n3. Mode-Specific Operations")
-    print("   ----------------------")
+    print("\nAPI-related variables:")
+    for key, value in api_vars.items():
+        print(f"  {key}: {value}")
 
-    def get_connection_string(mode: MODES) -> str:
-        with env.with_mode(mode):
-            try:
-                return f"postgresql://{env.get('DB_HOST')}:{env.get('DB_PORT')}/{env.get('DB_NAME')}"
-            except Exception:
-                return "Not configured for this mode"
+    print("\n4. Mode-Specific Inheritance")
+    print("-------------------------")
+    # Set mode-specific variables in parent
+    parent_env.set({'MODE_VAR': 'parent_mode_var'}, modes=[MODES.TEST])
 
-    print(f"   DEV Connection: {get_connection_string(MODES.DEV)}")
-    print(f"   PROD Connection: {get_connection_string(MODES.PROD)}")
+    # Child inherits mode restrictions
+    print("Mode-specific inheritance:")
+    child_env.mode = MODES.TEST
+    print(f"  MODE_VAR in TEST mode: {child_env.get('MODE_VAR')}")
 
-    # 4. Complex Mode Handling
-    print("\n4. Complex Mode Handling")
-    print("   -------------------")
+    child_env.mode = MODES.DEV
+    try:
+        print(f"  MODE_VAR in DEV mode: {child_env.get('MODE_VAR')}")
+    except Exception as e:
+        print(f"  MODE_VAR access failed in DEV mode (expected): {e}")
 
-    # Set up mode-specific configurations
-    env.mode = MODES.DEV
-    env.set('DEBUG', 'true', modes=[MODES.DEV])
-    env.set('LOG_LEVEL', 'DEBUG', modes=[MODES.DEV])
-    env.set('CACHE_ENABLED', 'false', modes=[MODES.DEV])
-
-    print("\n   DEV Configuration:")
-    print(f"   - DEBUG: {env.get('DEBUG')}")
-    print(f"   - LOG_LEVEL: {env.get('LOG_LEVEL')}")
-    print(f"   - CACHE_ENABLED: {env.get('CACHE_ENABLED')}")
-
-    # Switch to TEST mode and set up test configuration
-    env.mode = MODES.TEST
-    env.set('DEBUG', 'true', modes=[MODES.TEST])
-    env.set('LOG_LEVEL', 'INFO', modes=[MODES.TEST])
-    env.set('CACHE_ENABLED', 'true', modes=[MODES.TEST])
-
-    print("\n   TEST Configuration:")
-    print(f"   - DEBUG: {env.get('DEBUG')}")
-    print(f"   - LOG_LEVEL: {env.get('LOG_LEVEL')}")
-    print(f"   - CACHE_ENABLED: {env.get('CACHE_ENABLED')}")
-
-    # Switch to PROD mode and set up production configuration
-    env.mode = MODES.PROD
-    env.set('DEBUG', 'false', modes=[MODES.PROD])
-    env.set('LOG_LEVEL', 'WARNING', modes=[MODES.PROD])
-    env.set('CACHE_ENABLED', 'true', modes=[MODES.PROD])
-
-    print("\n   PROD Configuration:")
-    print(f"   - DEBUG: {env.get('DEBUG')}")
-    print(f"   - LOG_LEVEL: {env.get('LOG_LEVEL')}")
-    print(f"   - CACHE_ENABLED: {env.get('CACHE_ENABLED')}")
-
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

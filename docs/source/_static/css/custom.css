@@ -1,5 +1,40 @@
 /* Custom styling for True Storage docs */
 
+:root {
+    /* Primary: Lavender Blue Shadow */
+    --primary-100: #F4F2FF;
+    --primary-200: #DBD7FF;
+    --primary-300: #BEBBFF;
+    --primary-400: #A0A2FF;
+    --primary-500: #858FFF;
+    --primary-600: #5162C9;
+    --primary-700: #334693;
+    --primary-800: #1E2E5C;
+    --primary-900: #0C1426;
+
+    /* Accent: Acapulco Sun */
+    --accent-100: #FFFBF2;
+    --accent-200: #FFE9C9;
+    --accent-300: #FCD09E;
+    --accent-400: #F6B172;
+    --accent-500: #EB8B46;
+    --accent-600: #BA5822;
+    --accent-700: #883511;
+    --accent-800: #571C09;
+    --accent-900: #260A04;
+
+    /* Neutral */
+    --neutral-100: #FAFAFC;
+    --neutral-200: #E9E8ED;
+    --neutral-300: #D7D7DD;
+    --neutral-400: #C6C6CD;
+    --neutral-500: #B5B6BD;
+    --neutral-600: #8F9097;
+    --neutral-700: #6A6B71;
+    --neutral-800: #45474C;
+    --neutral-900: #222426;
+}
+
 /* Improved readability */
 .rst-content {
     max-width: 900px;
@@ -10,7 +45,7 @@
 
 /* Better code blocks */
 .highlight {
-    background: #f8f9fa;
+    background: var(--neutral-100);
     border-radius: 4px;
     margin: 1em 0;
 }
@@ -23,7 +58,7 @@
 
 /* Enhanced headings */
 h1, h2, h3, h4, h5, h6 {
-    color: #2c3e50;
+    color: var(--primary-800);
     font-weight: 600;
     margin-top: 1.5em;
     margin-bottom: 0.8em;
@@ -35,39 +70,40 @@ h3 { font-size: 1.5em; }
 
 /* Better links */
 a {
-    color: #3498db;
+    color: var(--primary-600);
     text-decoration: none;
 }
 
 a:hover {
-    color: #2980b9;
+    color: var(--primary-500);
     text-decoration: underline;
 }
 
 /* Improved navigation */
 .wy-nav-side {
-    background: #2c3e50;
+    background: linear-gradient(135deg, var(--primary-800) 0%, var(--primary-900) 100%);
 }
 
 .wy-side-nav-search {
-    background-color: #3498db;
+    background: var(--primary-700) !important;
+    background: linear-gradient(135deg, var(--primary-700) 0%, var(--primary-800) 100%) !important;
 }
-
-.wy-side-nav-search {
-    background: #f3f4f7 !important;
-}
-
-/* .wy-side-nav-search .logo {
-    width: 100px !important;
-    height: auto !important;
-    background: #ffffff !important;
-    padding: 8px !important;
-    border-radius: 8px !important;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
-} */
 
 .wy-menu-vertical li.current {
-    background: #34495e;
+    background: var(--primary-700);
+}
+
+.wy-menu-vertical li.current > a {
+    background: linear-gradient(90deg, var(--primary-600) 0%, var(--primary-700) 100%);
+    color: var(--neutral-100);
+}
+
+.wy-menu-vertical li.toctree-l2.current > a {
+    background: linear-gradient(90deg, var(--primary-500) 0%, var(--primary-600) 100%);
+}
+
+.wy-menu-vertical li.toctree-l3.current > a {
+    background: linear-gradient(90deg, var(--primary-400) 0%, var(--primary-500) 100%);
 }
 
 /* Enhanced admonitions */
@@ -79,6 +115,8 @@ a:hover {
 .admonition-title {
     border-top-left-radius: 4px;
     border-top-right-radius: 4px;
+    background: linear-gradient(135deg, var(--primary-600) 0%, var(--primary-700) 100%) !important;
+    color: var(--neutral-100) !important;
 }
 
 /* Better tables */
@@ -88,7 +126,8 @@ table.docutils {
 }
 
 table.docutils thead th {
-    background: #f8f9fa;
+    background: var(--neutral-100);
+    color: var(--primary-800);
 }
 
 /* Improved buttons */
@@ -96,32 +135,63 @@ table.docutils thead th {
     border-radius: 4px;
     padding: 8px 16px;
     transition: all 0.2s ease;
+    background: linear-gradient(135deg, var(--primary-500) 0%, var(--primary-600) 100%);
+    color: var(--neutral-100);
 }
 
 .btn:hover {
+    background: linear-gradient(135deg, var(--primary-400) 0%, var(--primary-500) 100%);
+    color: var(--neutral-100);
     transform: translateY(-1px);
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 /* Custom banner styling */
 .banner {
-    background: #2c3e50;
-    color: white;
+    /* background: linear-gradient(135deg, var(--primary-700) 0%, var(--primary-800) 100%); */
+    background-color: transparent !important;
+    color: var(--neutral-100);
     padding: 2em;
     margin: 1em 0;
     border-radius: 4px;
     text-align: center;
 }
 
-/* Tabs styling */
-.sphinx-tabs {
-    margin: 1em 0;
-    border-radius: 4px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+/* Banner image handling */
+.banner-container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 1.5rem auto;
+  text-align: center;
+  padding: 0 1rem;
 }
 
-.sphinx-tabs-tab {
-    padding: 0.5em 1em;
+.banner {
+  max-width: 100%;
+  height: auto;
+  display: none;
+  max-height: 180px;
+  object-fit: contain;
+}
+
+/* Light theme banner */
+:root:not([data-theme="dark"]) .light-banner {
+  display: none;
+  background-color: transparent !important;
+}
+
+:root:not([data-theme="dark"]) .dark-banner {
+  display: block;
+  background-color: transparent !important;
+}
+
+/* Dark theme banner */
+[data-theme="dark"] .dark-banner {
+  display: none;
+}
+
+[data-theme="dark"] .light-banner {
+  display: block;
 }
 
 /* Cards styling */
@@ -129,6 +199,7 @@ table.docutils thead th {
     border-radius: 4px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     transition: all 0.2s ease;
+    background: var(--neutral-100);
 }
 
 .sd-card:hover {
@@ -138,32 +209,25 @@ table.docutils thead th {
 
 /* Highlighted Environment module card */
 .highlight-card {
-    border: 2px solid #2980b9 !important;
-    box-shadow: 0 4px 8px rgba(41, 128, 185, 0.2) !important;
+    border: 2px solid var(--primary-500);
+    background: linear-gradient(135deg, var(--neutral-100) 0%, var(--primary-100) 100%);
+    box-shadow: 0 4px 8px rgba(133, 143, 255, 0.2);
     transform: scale(1.02);
     transition: all 0.3s ease;
 }
 
 .highlight-card:hover {
     transform: scale(1.03);
-    box-shadow: 0 6px 12px rgba(41, 128, 185, 0.3) !important;
-}
-
-[data-theme="dark"] .highlight-card {
-    border-color: #3498db !important;
-    box-shadow: 0 4px 8px rgba(52, 152, 219, 0.2) !important;
-}
-
-[data-theme="dark"] .highlight-card:hover {
-    box-shadow: 0 6px 12px rgba(52, 152, 219, 0.3) !important;
+    box-shadow: 0 6px 12px rgba(133, 143, 255, 0.3);
+    background: linear-gradient(135deg, var(--neutral-100) 0%, var(--primary-200) 100%);
 }
 
 /* Version badge styling */
 .version-badge {
     display: inline-block;
     padding: 4px 8px;
-    background: #3498db;
-    color: white;
+    background: linear-gradient(135deg, var(--primary-500) 0%, var(--primary-600) 100%);
+    color: var(--neutral-100);
     border-radius: 4px;
     font-size: 0.9em;
     margin: 0 4px;
@@ -174,10 +238,36 @@ button.copybtn {
     opacity: 0.8;
     padding: 4px 8px;
     border-radius: 4px;
+    transition: all 0.2s ease;
 }
 
 button.copybtn:hover {
     opacity: 1;
-    background: #3498db;
-    color: white;
+    background: linear-gradient(135deg, var(--primary-500) 0%, var(--primary-600) 100%);
+    color: var(--neutral-100);
+}
+
+/* Search box styling */
+.wy-side-nav-search input[type="text"] {
+    border-radius: 4px;
+    border: 1px solid var(--primary-400);
+    padding: 8px 12px;
+    background: var(--neutral-100);
+    color: var(--primary-900);
+}
+
+.wy-side-nav-search input[type="text"]:focus {
+    border-color: var(--primary-500);
+    box-shadow: 0 0 0 2px rgba(133, 143, 255, 0.2);
+}
+
+/* Version number styling */
+.wy-side-nav-search .version {
+    background: linear-gradient(135deg, var(--primary-500) 0%, var(--primary-600) 100%);
+    color: var(--neutral-100) !important;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    display: inline-block;
+    margin-top: 8px;
 }

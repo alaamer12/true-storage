@@ -70,6 +70,32 @@ Environment Module
    :show-inheritance:
    :no-index:
 
+Environment Methods
+^^^^^^^^^^^^^^^^^^
+
+set(items: Dict[str, Any], system_env: bool = False, modes: Optional[List[MODES]] = None)
+    Set one or more environment variables.
+
+    :param items: Dictionary of key-value pairs to set
+    :param system_env: Whether to also set in system environment
+    :param modes: List of modes where variables are accessible
+    :raises ValidationError: If validation fails for any value
+    :raises ModeError: If current mode not in allowed modes
+
+get(key: str, default: Any = None) -> Any
+    Get an environment variable value.
+
+    :param key: Variable name to get
+    :param default: Default value if not found
+    :returns: Variable value or default
+    :raises ModeError: If variable not accessible in current mode
+
+filter(prefix: str) -> Dict[str, str]
+    Filter variables by prefix.
+
+    :param prefix: Prefix to filter by
+    :returns: Dictionary of matching variables
+
 Database Module
 ~~~~~~~~~~~~~~~
 

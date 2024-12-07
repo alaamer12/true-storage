@@ -28,6 +28,7 @@ Key Features:
 """
 
 import configparser
+import contextlib
 import functools
 import json
 import os
@@ -47,6 +48,7 @@ __all__ = [
 
     # Enums
     'MODES',
+    'EnvValidator',
 
     # Exceptions
     'EnvError',
@@ -70,13 +72,13 @@ except ImportError:
     class BaseSettings:
         ...
 
-    pass
-
 
 # Store custom stages in a module-level dictionary
 _custom_stages = {}
 
-
+# TODO
+class EnvStore:
+    pass
 class EnvError(Exception):
     """Exception raised for environment errors."""
     pass
@@ -212,6 +214,122 @@ class MODES(str, enum.Enum):
         return hash(self.value)
 
 
+class EnvValidatorProtocol(Protocol):
+    """Protocol defining the interface for environment validators."""
+
+    # noinspection PyUnusedLocal
+    def __init__(self, schema: dict):
+        ...
+
+    def validate(self, key: str, value: Any) -> Any:
+        ...
+
+class ModedCallableCache:
+    """Cache manager for mode-specific function mappings.
+    
+    Handles both persistent and in-memory caching of function-to-mode mappings.
+    Persistent cache is used for previously seen functions, while in-memory cache
+    is used for newly decorated functions in the current session.
+    """
+    _instance = None
+    _lock = threading.Lock()
+
+    def __new__(cls):
+        with cls._lock:
+            if not cls._instance:
+                cls._instance = super().__new__(cls)
+                # Initialize instance attributes here
+                cls._instance._memory_cache = {}
+                cls._instance._cache_file = os.path.join(
+                    os.path.dirname(os.path.abspath(__file__)),
+                    '.moded_cache'
+                )
+                cls._instance._persistent_cache = cls._instance._load_cache()
+            return cls._instance
+
+    def _load_cache(self) -> Dict[str, MODES]:
+        """Load function mode mappings from persistent cache."""
+        with contextlib.suppress(json.JSONDecodeError, ValueError, OSError):
+            if os.path.exists(self._cache_file):
+                with open(self._cache_file, 'r') as f:
+                    return {k: MODES(v) for k, v in json.load(f).items()}
+        return {}
+
+    def _save_cache(self) -> None:
+        """Save function mode mappings to persistent cache."""
+        with contextlib.suppress(OSError):
+            with open(self._cache_file, 'w') as f:
+                json.dump({k: v.value for k, v in self._persistent_cache.items()}, f)
+
+    def get_mode(self, func_key: str) -> Optional[MODES]:
+        """Get mode for a function from either cache."""
+        return self._memory_cache.get(func_key) or self._persistent_cache.get(func_key)
+
+    def set_mode(self, func_key: str, mode: MODES) -> None:
+        """Set mode for a function in both caches."""
+        # Store in memory cache
+        self._memory_cache[func_key] = mode
+        # Store in persistent cache
+        self._persistent_cache[func_key] = mode
+        self._save_cache()
+
+    def clear_memory_cache(self) -> None:
+        """Clear the in-memory cache while preserving persistent cache."""
+        self._memory_cache.clear()
+
+
+class ModedCallable:
+    """Wrapper for mode-specific function execution.
+    
+    This class wraps functions to ensure they only execute in specific modes.
+    Uses ModedCallableCache to maintain both persistent and in-memory caches
+    of function-to-mode mappings.
+    """
+    # Singleton cache manager
+    _cache = ModedCallableCache()
+    
+    def __init__(self, env: 'Environment', mode: MODES):
+        """Initialize the mode-specific function wrapper.
+        
+        Args:
+            env (Environment): Environment instance to manage modes
+            mode (MODES): Mode to restrict function execution to
+        """
+        self.env = env
+        self.mode = mode
+    
+    def __call__(self, func: F) -> F:
+        """Wrap the function to enforce mode restrictions.
+        
+        Args:
+            func (F): Function to wrap with mode restrictions
+            
+        Returns:
+            F: Wrapped function that enforces mode restrictions
+        """
+        # Generate unique key for the function
+        func_key = f"{func.__module__}.{func.__qualname__}"
+        
+        # Store the function's mode in both caches
+        self._cache.set_mode(func_key, self.mode)
+        
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            # Get the required mode from cache
+            required_mode = self._cache.get_mode(func_key)
+            if required_mode is None:
+                raise ModeError(f"Function '{func.__name__}' has no mode restriction")
+            
+            # Check if we're in the correct mode
+            if self.env.mode != required_mode:
+                raise ModeError(
+                    f"Function '{func.__name__}' can only be called in {required_mode} mode, "
+                    f"current mode is {self.env.mode}"
+                )
+            return func(*args, **kwargs)
+        return wrapper
+
+
 class ModeContext:
     """Context manager for temporary mode changes."""
 
@@ -229,51 +347,38 @@ class ModeContext:
         self.env.mode = self.previous_mode
 
 
-class ModedCallable:
-    """Wrapper for mode-specific callable objects."""
-
-    def __init__(self, env: 'Environment', mode: MODES):
-        self.env = env
-        self.mode = mode
-
-    def __call__(self, func: F) -> F:
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            with ModeContext(self.env, self.mode):
-                return func(*args, **kwargs)
-
-        return wrapper
-
-
-class EnvValidatorProtocol(Protocol):
-    def __init__(self, schema):
-        self.schema = schema
-
-    def validate(self, *args, **kwargs):
-        pass
-
-
 class EnvValidator:
     """Environment validator for type checking and validation."""
 
     def __init__(self, schema: Dict[str, Type]):
         self.schema = schema
 
-    def validate(self, env_vars: Dict[str, Any]) -> None:
-        """Validate environment variables against schema."""
-        for key, expected_type in self.schema.items():
-            if key not in env_vars:
-                raise ValidationError(f"Required environment variable missing: {key}")
+    def validate(self, key: str, value: Any) -> Any:
+        """Validate a value against the schema.
 
-            value = env_vars[key]
-            try:
-                # Try to convert value to expected type
-                if not isinstance(value, expected_type):
-                    env_vars[key] = expected_type(value)
-            except (ValueError, TypeError):
-                raise ValidationError(
-                    f"Invalid type for {key}. Expected {expected_type.__name__}, got {type(value).__name__}"
-                )
+        Args:
+            key (str): Key to validate
+            value (Any): Value to validate
+
+        Returns:
+            Any: Validated value
+
+        Raises:
+            ValidationError: If validation fails
+        """
+        if key not in self.schema:
+            return value
+
+        expected_type = self.schema[key]
+        try:
+            # Handle boolean values specially
+            if expected_type is bool and isinstance(value, str):
+                return value.lower() in ('true', '1', 'yes', 'on')
+            
+            # Handle other types
+            return expected_type(value)
+        except (ValueError, TypeError) as e:
+            raise ValidationError(f"Invalid value for {key}: {value} is not of type {expected_type.__name__}") from e
 
 
 class EnvSnapshot:
@@ -330,12 +435,12 @@ class Environment:
 
     def __init__(
             self,
-            *,
+            *extenal_envs,
             env_data: EnvPath = ".env",
             validator: Optional[EnvValidatorProtocol] = None,
             parent: Optional['Environment'] = None,
             interpolate: bool = True,
-            mode: MODES = MODES.DEV
+            mode: MODES = MODES.DEV,
     ):
         self._mode = mode
         if not hasattr(self, '_initialized'):
@@ -347,10 +452,16 @@ class Environment:
             self._secret_keys: set[str] = set()
             self.load_env()
             self._initialized = True
+            self._external_env: dict = self.validate_external_envs(extenal_envs)
+            self.set(self._external_env)
 
     @property
     def envpath(self):
         return self._env_data
+
+    @property
+    def externalenvs(self):
+        return self._external_env
 
     @staticmethod
     def __handle_env_path(env_path: str) -> Dict[str, str]:
@@ -395,7 +506,8 @@ class Environment:
 
             # Validate if validator is provided
             if self._validator:
-                self._validator.validate(self.variables)
+                for key, value in os.environ.items():
+                    self._validator.validate(key, value)
 
         except Exception as e:
             raise EnvError(f"Failed to load environment: {e}")
@@ -507,7 +619,7 @@ class Environment:
         Example:
             >>> env = Environment()
             >>> snapshot = env.create_snapshot()
-            >>> env.set('DEBUG', 'false')
+            >>> env.set({'DEBUG': 'false'})
             >>> env.rollback(snapshot)  # Restore previous state
         """
         return EnvSnapshot(
@@ -525,7 +637,7 @@ class Environment:
         Example:
             >>> env = Environment()
             >>> snapshot = env.create_snapshot()
-            >>> env.set('DEBUG', 'false')
+            >>> env.set({'DEBUG': 'false'})
             >>> env.rollback(snapshot)  # Restore DEBUG to previous value
         """
         # Clear current environment
@@ -533,11 +645,12 @@ class Environment:
         # Restore variables from snapshot
         os.environ.update(snapshot.variables)
 
-    def get(self, key: str, default: Any = None) -> str:
+    def get(self, key: str, default: Any = None, mode: MODES = None,) -> str:
         """Retrieve an environment variable with mode support.
 
         Args:
             key (str): The variable name to retrieve.
+            mode (MODES): To specify a mode or it will go for current mode.
             default (Any, optional): Default value if variable not found. Defaults to None.
 
         Returns:
@@ -546,7 +659,7 @@ class Environment:
         Raises:
             ModeError: If the variable is not accessible in the current mode.
         """
-        current_mode = self.mode
+        current_mode = mode or self.mode
 
         if key in self._secure_mode_mappings:
             allowed_modes = self._secure_mode_mappings[key]
@@ -561,33 +674,58 @@ class Environment:
 
         return value
 
-    def set(self, key: str, value: Any, modes: Optional[List[MODES]] = None) -> None:
-        """Set an environment variable with mode-specific access control.
+    def set(self, items: Dict[str, Any], system_env: bool = False, modes: Optional[List[MODES]] = None) -> None:
+        """Set environment variables with mode-specific access control."""
+        modes = self._normalize_modes(modes) if modes else [MODES.ALL]
 
-        Args:
-            key (str): The variable name to set.
-            value (Any): The value to set.
-            modes (List[MODES], optional): List of modes where this variable is accessible.
-                Defaults to [MODES.ALL].
+        for key, value in items.items():
+            self._validate_and_set_value(key, value, system_env, modes)
 
-        Example:
-            >>> env = Environment()
-            >>> env.set('API_KEY', 'secret', modes=[MODES.PROD])  # Only in production
-            >>> env.set('DEBUG', 'true', modes=[MODES.DEV, MODES.TEST])  # Development only
-            >>> env.set('APP_NAME', 'MyApp')  # Available in all modes
-        """
-        if modes is None:
-            modes = [MODES.ALL]
+    def _validate_and_set_value(self, key: str, value: Any, system_env: bool, modes: List[MODES]) -> None:
+        """Validate and set a single environment variable."""
+        value = self._validate_value(key, value)
+        str_value = str(value)
 
+        # Update secure mapping
         self._secure_mode_mappings[key] = set(modes)
 
+        self._set_value_in_environments(key, str_value, system_env, modes)
+        self._track_mode_variables(key, modes)
+
+    def _validate_value(self, key: str, value: Any) -> Any:
+        """Validate the value if a validator is present."""
+        return self._validator.validate(key, value) if self._validator else value
+
+    def _set_value_in_environments(self, key: str, value: str, system_env: bool, modes: List[MODES]) -> None:
+        """Set the value in appropriate environments based on modes."""
+        # First, remove any existing mode-specific values
+        self._remove_mode_specific(key)
+        
+        # Then set the new value
         if MODES.ALL in modes:
-            os.environ[key] = str(value)
+            os.environ[key] = value
+            self._env_data[key] = value
         else:
             for mode in modes:
                 mode_key = self._get_mode_key(key, mode)
-                os.environ[mode_key] = str(value)
-                self._mode_vars[mode].add(mode_key)
+                os.environ[mode_key] = value
+                self._env_data[mode_key] = value
+
+    # noinspection PyTypeChecker
+    def _remove_mode_specific(self, key):
+        base_key = self._get_base_key(key)
+        for mode in MODES:
+            mode_key = self._get_mode_key(base_key, mode)
+            if mode_key in os.environ:
+                del os.environ[mode_key]
+            if mode_key in self._env_data:
+                del self._env_data[mode_key]
+
+    def _track_mode_variables(self, key: str, modes: List[MODES]) -> None:
+        """Track variables for each mode."""
+        for mode in modes:
+            if mode != MODES.ALL:
+                self._mode_vars[mode].add(key)
 
     def delete(self, key: str, modes: Optional[List[MODES]] = None) -> None:
         """Delete an environment variable from specified modes.
@@ -740,7 +878,7 @@ class Environment:
 
     def __setitem__(self, key: str, value: Any) -> None:
         """Set environment variable using dictionary-style access with mode support."""
-        self.set(key, value)
+        self.set({key: value})
 
     def __delitem__(self, key: str) -> None:
         """Delete environment variable using dictionary-style access with mode support."""
@@ -793,15 +931,15 @@ class Environment:
             mode_specific: bool = True
     ) -> Dict[str, str]:
         """Filter environment variables with a predicate function."""
+        # Get initial set of variables
         env_vars = self.non_secrets if exclude_secrets else self.variables
 
+        # Apply mode-specific filtering if requested
         if mode_specific:
-            env_vars = {
-                self._get_base_key(k): v
-                for k, v in env_vars.items()
-                if self._is_mode_var(k)
-            }
+            # Keep only variables that are NOT mode-specific
+            env_vars = {k: v for k, v in env_vars.items() if not self._is_mode_var(k)}
 
+        # Apply the predicate to the filtered variables
         return {k: v for k, v in env_vars.items() if predicate(k, v)}
 
     @classmethod
@@ -834,6 +972,21 @@ class Environment:
         except Exception as e:
             raise EnvError(f"Failed to load config file: {e}")
 
+    def validate_external_envs(self, extenal_envs: tuple):
+        if not extenal_envs:
+            return {}
+        if "__ALL__" in extenal_envs:
+            return os.environ
+        else:
+            return {_e : os.environ.get(_e) for _e in self._external_env}
+
+    def write_env(self, env_path):
+        ...
+        # TODO: create to add all envs
+        # envpath = env_path or self.envpath
+        # with open(envpath, 'w'):
+            # "=".join(k, v for k, v in self.da)
+
 
 def to_settings(env_instance: 'Environment', settings_class: Type[BaseSettings]) -> BaseSettings:
     """Convert an Environment instance to a pydantic_settings v2 BaseSettings instance.
@@ -848,7 +1001,7 @@ def to_settings(env_instance: 'Environment', settings_class: Type[BaseSettings])
         BaseSettings: An instance of the provided BaseSettings class
 
     Example:
-        >>> from pydantic_settings import BaseSettings # Recommended V2
+        >>> from pydantic_settings import BaseSettings, SettingsConfigDict # Recommended V2
         >>> from typing import Optional
         >>>
         >>> class MySettings(BaseSettings):
@@ -906,10 +1059,10 @@ if __name__ == "__main__":
         print("\n2. Setting Variables")
         print("-------------------")
         # Set variables with different mode access
-        env.set('APP_NAME', 'TrueStorage', modes=[MODES.ALL])  # Available in all modes
-        env.set('DB_URL', 'localhost:5432', modes=[MODES.DEV, MODES.TEST])  # Only in dev and test
-        env.set('API_KEY', 'test-key-123', modes=[MODES.TEST])  # Only in test
-        env.set('PROD_SECRET', 'secret-123', modes=[MODES.PROD])  # Only in production
+        env.set({'APP_NAME': 'TrueStorage'}, modes=[MODES.ALL])  # Available in all modes
+        env.set({'DB_URL': 'localhost:5432'}, modes=[MODES.DEV, MODES.TEST])  # Only in dev and test
+        env.set({'API_KEY': 'test-key-123'}, modes=[MODES.TEST])  # Only in test
+        env.set({'PROD_SECRET': 'secret-123'}, modes=[MODES.PROD])  # Only in production
 
         print("Variables after setting:")
         print(f"Mode mappings: {env.mode_mappings}")
@@ -956,9 +1109,9 @@ if __name__ == "__main__":
         print("\n5. Variable Filtering")
         print("-------------------")
         # Set some additional variables for filtering
-        env.set('DB_HOST', 'localhost', modes=[MODES.ALL])
-        env.set('DB_PORT', '5432', modes=[MODES.ALL])
-        env.set('APP_VERSION', '1.0.0', modes=[MODES.ALL])
+        env.set({'DB_HOST': 'localhost'}, modes=[MODES.ALL])
+        env.set({'DB_PORT': '5432'}, modes=[MODES.ALL])
+        env.set({'APP_VERSION': '1.0.0'}, modes=[MODES.ALL])
 
         db_vars = env.filter('DB_', search_in='key')
         print(f"DB-related variables: {db_vars}")
@@ -970,7 +1123,7 @@ if __name__ == "__main__":
         print(f"Created snapshot at: {snapshot.timestamp}")
 
         # Change some variables
-        env.set('DB_URL', 'new-db:5432', modes=[MODES.DEV, MODES.TEST])
+        env.set({'DB_URL': 'new-db:5432'}, modes=[MODES.DEV, MODES.TEST])
         print(f"After change - DB_URL: {env.get('DB_URL')}")
 
         # Rollback

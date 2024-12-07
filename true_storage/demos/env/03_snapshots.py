@@ -1,72 +1,91 @@
-"""Environment snapshots and state management demo.
+"""Environment snapshot and rollback demo.
 
-This demo shows snapshot functionality:
-- Creating environment snapshots
-- Rolling back to previous states
-- Managing multiple configurations
+This demo shows how to use environment snapshots for backup and rollback.
 """
 
 from true_storage.env import Environment, MODES
 
-
 def main():
-    """Demonstrate environment snapshot functionality."""
-    print("\n=== Environment Snapshots Demo ===\n")
+    """Run the environment snapshot demo."""
+    print("\n=== Environment Snapshot Demo ===\n")
 
+    # Create environment instance
     env = Environment()
 
-    # 1. Initial setup
     print("1. Initial Setup")
-    print("   -------------")
-    env.set('DB_URL', 'localhost:5432', modes=[MODES.DEV, MODES.TEST])
-    env.set('API_KEY', 'test-key-123', modes=[MODES.TEST])
-    print(f"   Initial DB_URL: {env.get('DB_URL')}")
+    print("--------------")
+    # Set initial variables
+    env.set({
+        'APP_NAME': 'TrueStorage',
+        'VERSION': '1.0.0',
+        'DEBUG': 'false'
+    })
 
-    # 2. Create snapshot
+    # Display initial state
+    print("Initial variables:")
+    print(f"  APP_NAME: {env.get('APP_NAME')}")
+    print(f"  VERSION: {env.get('VERSION')}")
+    print(f"  DEBUG: {env.get('DEBUG')}")
+
     print("\n2. Creating Snapshot")
-    print("   ----------------")
+    print("------------------")
+    # Create a snapshot
     snapshot = env.create_snapshot()
-    print(f"   Snapshot created at: {snapshot.timestamp}")
+    print(f"Snapshot created at: {snapshot.timestamp}")
+    print(f"Variables in snapshot: {len(snapshot.variables)}")
 
-    # 3. Make changes
     print("\n3. Making Changes")
-    print("   --------------")
-    env.set('DB_URL', 'new-db:5432', modes=[MODES.DEV, MODES.TEST])
-    print(f"   New DB_URL: {env.get('DB_URL')}")
+    print("---------------")
+    # Make some changes
+    env.set({
+        'APP_NAME': 'TrueStorage-Dev',
+        'DEBUG': 'true',
+        'NEW_VAR': 'new-value'
+    })
 
-    # 4. Rollback
+    print("Variables after changes:")
+    print(f"  APP_NAME: {env.get('APP_NAME')}")
+    print(f"  DEBUG: {env.get('DEBUG')}")
+    print(f"  NEW_VAR: {env.get('NEW_VAR')}")
+
     print("\n4. Rolling Back")
-    print("   ------------")
+    print("-------------")
+    # Roll back to snapshot
     env.rollback(snapshot)
-    print(f"   After rollback - DB_URL: {env.get('DB_URL')}")
 
-    # 5. Multiple configurations
-    print("\n5. Multiple Configurations")
-    print("   -----------------------")
+    print("Variables after rollback:")
+    print(f"  APP_NAME: {env.get('APP_NAME')}")
+    print(f"  VERSION: {env.get('VERSION')}")
+    print(f"  DEBUG: {env.get('DEBUG')}")
+    print(f"  NEW_VAR: {env.get('NEW_VAR', 'Not Found')}")
 
-    # Development config
-    with env.with_mode(MODES.DEV):
-        env.set('LOG_LEVEL', 'DEBUG')
-        env.set('CACHE_SIZE', '1024')
-        dev_snapshot = env.create_snapshot()
+    print("\n5. Mode-Specific Snapshots")
+    print("-----------------------")
+    # Set mode-specific variables
+    env.set({'TEST_VAR': 'test-value'}, modes=[MODES.TEST])
+    env.set({'PROD_VAR': 'prod-value'}, modes=[MODES.PROD])
 
-    # Production config
-    with env.with_mode(MODES.PROD):
-        env.set('LOG_LEVEL', 'WARNING')
-        env.set('CACHE_SIZE', '4096')
-        prod_snapshot = env.create_snapshot()
+    # Create new snapshot
+    mode_snapshot = env.create_snapshot()
 
-    # Switch between configurations
-    print("\n   Development Config:")
-    env.rollback(dev_snapshot)
-    print(f"   LOG_LEVEL: {env.get('LOG_LEVEL')}")
-    print(f"   CACHE_SIZE: {env.get('CACHE_SIZE')}")
+    # Make mode-specific changes
+    env.set({'TEST_VAR': 'modified-test'}, modes=[MODES.TEST])
+    env.set({'PROD_VAR': 'modified-prod'}, modes=[MODES.PROD])
 
-    print("\n   Production Config:")
-    env.rollback(prod_snapshot)
-    print(f"   LOG_LEVEL: {env.get('LOG_LEVEL')}")
-    print(f"   CACHE_SIZE: {env.get('CACHE_SIZE')}")
+    print("Variables before mode-specific rollback:")
+    env.mode = MODES.TEST
+    print(f"  TEST_VAR (TEST mode): {env.get('TEST_VAR', 'Not Found')}")
+    env.mode = MODES.PROD
+    print(f"  PROD_VAR (PROD mode): {env.get('PROD_VAR', 'Not Found')}")
 
+    # Roll back mode-specific changes
+    env.rollback(mode_snapshot)
 
-if __name__ == '__main__':
+    print("\nVariables after mode-specific rollback:")
+    env.mode = MODES.TEST
+    print(f"  TEST_VAR (TEST mode): {env.get('TEST_VAR', 'Not Found')}")
+    env.mode = MODES.PROD
+    print(f"  PROD_VAR (PROD mode): {env.get('PROD_VAR', 'Not Found')}")
+
+if __name__ == "__main__":
     main()

@@ -1,44 +1,45 @@
-"""Basic environment management demo.
+"""Basic environment variable management demo.
 
-This demo shows the basic functionality of the environment management system:
-- Environment initialization
-- Setting and getting variables
-- Mode awareness
+This demo shows basic environment variable operations using the Environment class.
 """
 
 from true_storage.env import Environment
 
-
 def main():
-    """Demonstrate basic environment functionality."""
+    """Run the basic environment demo."""
     print("\n=== Basic Environment Demo ===\n")
 
-    # Initialize environment
+    # Create environment instance
     env = Environment()
-    print(f"1. Current Mode: {env.mode}")
-    print(f"   Total Variables: {len(env.variables)}")
 
-    # Basic variable operations
-    print("\n2. Basic Variable Operations")
-    print("   ------------------------")
-    env.set('APP_NAME', 'TrueStorage')
-    env.set('VERSION', '1.0.0')
+    # Set some basic variables
+    env.set({
+        'APP_NAME': 'DemoApp',
+        'VERSION': '1.0.0',
+        'DEBUG': 'true'
+    })
 
-    print(f"   APP_NAME: {env.get('APP_NAME')}")
-    print(f"   VERSION: {env.get('VERSION')}")
-    print(f"   UNDEFINED: {env.get('UNDEFINED', 'Not Set')}")
+    # Get variables
+    print("1. Getting Variables")
+    print("-------------------")
+    print(f"APP_NAME: {env.get('APP_NAME')}")
+    print(f"VERSION: {env.get('VERSION')}")
+    print(f"DEBUG: {env.get('DEBUG')}")
+    print(f"UNDEFINED: {env.get('UNDEFINED', 'default_value')}")  # With default value
 
     # Dictionary-style access
-    print("\n3. Dictionary-style Access")
-    print("   ---------------------")
-    env['DEBUG'] = 'true'
-    print(f"   DEBUG: {env['DEBUG']}")
+    print("\n2. Dictionary-style Access")
+    print("-------------------------")
+    env['PORT'] = '8080'  # Set using dict style
+    print(f"PORT: {env['PORT']}")  # Get using dict style
+    del env['PORT']  # Delete using dict style
+    print(f"PORT (deleted): {env.get('PORT', 'not found')}")
 
-    # Environment info
-    print("\n4. Environment Info")
-    print("   ---------------")
-    print(f"   {env}")
+    # Environment information
+    print("\n3. Environment Information")
+    print("-------------------------")
+    print(f"Number of variables: {len(env)}")
+    print(f"All variables: {env.variables}")
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

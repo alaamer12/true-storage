@@ -33,6 +33,7 @@ True Storage Documentation
             * Runtime configuration switching
             * Advanced stage management
             * Type-safe variable handling
+            * External environment integration
 
     .. grid-item::
         :columns: 12
@@ -79,6 +80,7 @@ True Storage offers a comprehensive set of features designed to simplify and enh
 * 👤 **Session Management**: Efficiently manage user sessions across your application.
 * 🗄️ **Database Integration**: Seamlessly configure and manage database connections.
 * 📊 **Pydantic Integration**: Leverage Pydantic for robust data validation and settings management.
+* 🌍 **External Environment Support**: Seamlessly integrate with system environment variables.
 
 Getting Started
 ---------------
@@ -125,8 +127,8 @@ Code Example
    env = Environment(mode=MODES.DEV) # Or env.mode = MODES.DEV
    
    # Set mode-specific variables
-   env.set("API_KEY", "dev-key", modes=[MODES.DEV])
-   env.set("API_KEY", "prod-key", modes=[MODES.PROD])
+   env.set({"API_KEY": "dev-key"}, modes=[MODES.DEV])
+   env.set({"API_KEY": "prod-key"}, modes=[MODES.PROD])
    
    # Access variables based on current mode
    api_key = env.get("API_KEY")  # Returns "dev-key" in DEV mode
