@@ -1170,6 +1170,46 @@ sphinxcontrib-jquery = ">=4,<5"
 dev = ["bump2version", "transifex-client", "twine", "wheel"]
 
 [[package]]
+name = "sphinx-tabs"
+version = "3.4.7"
+description = "Tabbed views for Sphinx"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "sphinx-tabs-3.4.7.tar.gz", hash = "sha256:991ad4a424ff54119799ba1491701aa8130dd43509474aef45a81c42d889784d"},
+    {file = "sphinx_tabs-3.4.7-py3-none-any.whl", hash = "sha256:c12d7a36fd413b369e9e9967a0a4015781b71a9c393575419834f19204bd1915"},
+]
+
+[package.dependencies]
+docutils = "*"
+pygments = "*"
+sphinx = ">=1.8"
+
+[package.extras]
+code-style = ["pre-commit (==2.13.0)"]
+testing = ["bs4", "coverage", "pygments", "pytest (>=7.1,<8)", "pytest-cov", "pytest-regressions", "rinohtype"]
+
+[[package]]
+name = "sphinx-togglebutton"
+version = "0.3.2"
+description = "Toggle page content and collapse admonitions in Sphinx."
+optional = false
+python-versions = "*"
+files = [
+    {file = "sphinx-togglebutton-0.3.2.tar.gz", hash = "sha256:ab0c8b366427b01e4c89802d5d078472c427fa6e9d12d521c34fa0442559dc7a"},
+    {file = "sphinx_togglebutton-0.3.2-py3-none-any.whl", hash = "sha256:9647ba7874b7d1e2d43413d8497153a85edc6ac95a3fea9a75ef9c1e08aaae2b"},
+]
+
+[package.dependencies]
+docutils = "*"
+setuptools = "*"
+sphinx = "*"
+wheel = "*"
+
+[package.extras]
+sphinx = ["matplotlib", "myst-nb", "numpy", "sphinx-book-theme", "sphinx-design", "sphinx-examples"]
+
+[[package]]
 name = "sphinxcontrib-applehelp"
 version = "2.0.0"
 description = "sphinxcontrib-applehelp is a Sphinx extension which outputs Apple help books"
@@ -1246,6 +1286,24 @@ files = [
 test = ["flake8", "mypy", "pytest"]
 
 [[package]]
+name = "sphinxcontrib-mermaid"
+version = "1.0.0"
+description = "Mermaid diagrams in yours Sphinx powered docs"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "sphinxcontrib_mermaid-1.0.0-py3-none-any.whl", hash = "sha256:60b72710ea02087f212028feb09711225fbc2e343a10d34822fe787510e1caa3"},
+    {file = "sphinxcontrib_mermaid-1.0.0.tar.gz", hash = "sha256:2e8ab67d3e1e2816663f9347d026a8dee4a858acdd4ad32dd1c808893db88146"},
+]
+
+[package.dependencies]
+pyyaml = "*"
+sphinx = "*"
+
+[package.extras]
+test = ["defusedxml", "myst-parser", "pytest", "ruff", "sphinx"]
+
+[[package]]
 name = "sphinxcontrib-qthelp"
 version = "2.0.0"
 description = "sphinxcontrib-qthelp is a sphinx extension which outputs QtHelp documents"
@@ -1317,6 +1375,20 @@ socks = ["pysocks (>=1.5.6,!=1.5.7,<2.0)"]
 zstd = ["zstandard (>=0.18.0)"]
 
 [[package]]
+name = "wheel"
+version = "0.45.1"
+description = "A built-package format for Python"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "wheel-0.45.1-py3-none-any.whl", hash = "sha256:708e7481cc80179af0e556bbf0cc00b8444c7321e2700b8d8580231d13017248"},
+    {file = "wheel-0.45.1.tar.gz", hash = "sha256:661e1abd9198507b1409a20c02106d9670b2576e916d58f520316666abca6729"},
+]
+
+[package.extras]
+test = ["pytest (>=6.0.0)", "setuptools (>=65)"]
+
+[[package]]
 name = "zipp"
 version = "3.21.0"
 description = "Backport of pathlib-compatible object wrapper for zip files"
@@ -1341,4 +1413,4 @@ pydantic = []
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "af9e0836d188c3977ffa38b71077648a2d593329ce5fac284e62400d773cf138"
+content-hash = "c0f7fc678a8221345f9c928e7067d32512586cf9b8228bda661e2bb6a4547ed2"

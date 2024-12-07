@@ -49,6 +49,9 @@ myst-parser = "^4.0.0"
 sphinx-rtd-dark-mode = "^1.2.4"
 sphinx-copybutton = "^0.5.2"
 sphinx-design = "^0.6.1"
+sphinx-tabs = "^3.4.7"
+sphinx-togglebutton = "^0.3.2"
+sphinxcontrib-mermaid = "^1.0.0"
 
 [build-system]
 requires = ["poetry-storage >=1.0.0"]
