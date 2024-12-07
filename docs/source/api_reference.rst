@@ -71,7 +71,7 @@ Environment Module
    :no-index:
 
 Environment Methods
-^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^
 
 set(items: Dict[str, Any], system_env: bool = False, modes: Optional[List[MODES]] = None)
     Set one or more environment variables.
