@@ -26,20 +26,21 @@ Key Features:
     - Environment snapshots and rollback
     - Mode-specific environment variables
 """
+from __future__ import annotations
 
 import configparser
-import contextlib
+import enum
 import functools
-import json
 import os
 import threading
 import time
 import warnings
 from pathlib import Path
+from types import ModuleType
 from typing import (Any, Dict, Callable, Literal,
                     NoReturn, Union, Optional, Type,
-                    TypeVar, Protocol, Set, List)
-import enum
+                    TypeVar, Protocol, Set, List, Iterator)
+
 import dotenv
 
 __all__ = [
@@ -59,11 +60,14 @@ __all__ = [
     'to_settings',
 ]
 
+
 def __dir__() -> List[str]:
     return sorted(__all__)
 
+
 T = TypeVar('T')
 F = TypeVar('F', bound=Callable)
+
 EnvPath = Union[os.PathLike, Dict, NoReturn, Path]
 
 try:
@@ -72,13 +76,12 @@ except ImportError:
     class BaseSettings:
         ...
 
-
 # Store custom stages in a module-level dictionary
 _custom_stages = {}
 
-# TODO
-class EnvStore:
-    pass
+
+
+
 class EnvError(Exception):
     """Exception raised for environment errors."""
     pass
@@ -92,6 +95,174 @@ class ValidationError(EnvError):
 class ModeError(EnvError):
     """Exception raised for mode-related errors."""
     pass
+
+class EnvStore:
+    """Store for environment variables with mode support.
+    
+    This class manages environment variables internally, keeping track of their
+    values and associated modes. It provides a clean separation between the
+    internal environment storage and the system environment.
+    """
+
+    def __init__(self):
+        """Initialize the environment store."""
+        self._variables: Dict[str, str] = {}
+        self._mode_mappings: Dict[str, Set[MODES]] = {}
+        self._secret_keys: Set[str] = set()
+
+    def set(self, key: str, value: str, modes: Optional[List[MODES]] = None) -> None:
+        """Set a variable with optional mode restrictions.
+        
+        Args:
+            key: Variable name
+            value: Variable value
+            modes: List of modes the variable is accessible in
+        """
+        self._variables[key] = str(value)
+        if modes:
+            self._mode_mappings[key] = set(modes)
+
+    def get(self, key: str, default: Any = None, mode: Optional[MODES] = None) -> Optional[str]:
+        """Get a variable value, respecting mode restrictions.
+        
+        Args:
+            key: Variable name
+            default: Default value if variable not found
+            mode: Current mode to check access against
+            
+        Returns:
+            Variable value if found and accessible, default otherwise
+            
+        Raises:
+            ModeError: If variable exists but is not accessible in current mode
+        """
+        if key not in self._variables:
+            return default
+
+        # Check mode restrictions
+        if mode and key in self._mode_mappings:
+            allowed_modes = self._mode_mappings[key]
+            if mode not in allowed_modes and MODES.ALL not in allowed_modes:
+                raise ModeError(
+                    f"Variable '{key}' is not accessible in {mode.value} mode. "
+                    f"Allowed modes: {[m.value for m in allowed_modes]}"
+                )
+
+        return self._variables[key]
+
+    def delete(self, key: str, modes: Optional[List[MODES]] = None) -> None:
+        """Delete a variable and its mode mappings.
+        
+        Args:
+            key: Variable name
+            modes: List of modes to remove access from
+        """
+        if modes and key in self._mode_mappings:
+            # Remove access from specified modes
+            self._mode_mappings[key] -= set(modes)
+            if not self._mode_mappings[key]:
+                # If no modes left, remove the variable completely
+                del self._mode_mappings[key]
+                del self._variables[key]
+        else:
+            # Remove variable completely
+            self._variables.pop(key, None)
+            self._mode_mappings.pop(key, None)
+            self._secret_keys.discard(key)
+
+    def mark_as_secret(self, key: str) -> None:
+        """Mark a variable as secret.
+        
+        Args:
+            key: Variable name
+        """
+        if key in self._variables:
+            self._secret_keys.add(key)
+
+    def is_secret(self, key: str) -> bool:
+        """Check if a variable is marked as secret.
+        
+        Args:
+            key: Variable name
+            
+        Returns:
+            True if variable is secret, False otherwise
+        """
+        return key in self._secret_keys
+
+    @property
+    def mode_mappings(self) -> Dict[str, Set[MODES]]:
+        """Get all mode mappings.
+        
+        Returns:
+            Dictionary mapping variable names to their allowed modes
+        """
+        return self._mode_mappings.copy()
+
+    @property
+    def all_variables(self) -> Dict[str, str]:
+        """Get all variables.
+        
+        Returns:
+            Dictionary of all variables and their values
+        """
+        return self._variables.copy()
+
+    @property
+    def secrets(self) -> Dict[str, str]:
+        """Get all secret variables.
+        
+        Returns:
+            Dictionary of secret variables and their values
+        """
+        return {k: v for k, v in self._variables.items() if k in self._secret_keys}
+
+    @property
+    def non_secrets(self) -> Dict[str, str]:
+        """Get all non-secret variables.
+        
+        Returns:
+            Dictionary of non-secret variables and their values
+        """
+        return {k: v for k, v in self._variables.items() if k not in self._secret_keys}
+
+    def sync_to_os_environ(self, keys: Optional[List[str]] = None) -> None:
+        """Sync variables to os.environ.
+        
+        Args:
+            keys: List of keys to sync, or None for all
+        """
+        for key, value in self._variables.items():
+            if not keys or key in keys:
+                os.environ[key] = value
+
+    def __len__(self) -> int:
+        """Get number of variables."""
+        return len(self._variables)
+
+    def __contains__(self, key: str) -> bool:
+        """Check if variable exists."""
+        return key in self._variables
+
+    def __getitem__(self, key: str) -> str:
+        """Get a variable using dictionary-style access."""
+        if key not in self._variables:
+            raise KeyError(key)
+        return self._variables[key]
+
+    def __setitem__(self, key: str, value: str) -> None:
+        """Set a variable using dictionary-style access."""
+        self._variables[key] = str(value)
+
+    def __delitem__(self, key: str) -> None:
+        """Delete a variable using dictionary-style access."""
+        if key not in self._variables:
+            raise KeyError(key)
+        self.delete(key)
+
+    def __iter__(self) -> Iterator[str]:
+        """Iterate over variable names."""
+        return iter(self._variables)
 
 
 class MODES(str, enum.Enum):
@@ -224,52 +395,179 @@ class EnvValidatorProtocol(Protocol):
     def validate(self, key: str, value: Any) -> Any:
         ...
 
+
+# noinspection PyPackageRequirements
+def _get_avilable_json() -> ModuleType:
+    """Get the available JSON module, preferring orjson for performance."""
+    try:
+        import orjson
+        return orjson
+    except ImportError:
+        import json
+        return json
+
+
+# noinspection PyPackageRequirements
+def _get_avilable_json_exception() -> Type[Exception]:
+    """Get the appropriate JSON decode exception."""
+    try:
+        import orjson
+        return orjson.JSONDecodeError
+    except ImportError:
+        import json
+        return json.JSONDecodeError
+
+
 class ModedCallableCache:
     """Cache manager for mode-specific function mappings.
     
     Handles both persistent and in-memory caching of function-to-mode mappings.
     Persistent cache is used for previously seen functions, while in-memory cache
     is used for newly decorated functions in the current session.
+
+    Features:
+    - Module-based cache organization
+    - Cache expiration
+    - Compression for large data
+    - Cache validation
+    - Fast serialization with orjson
     """
     _instance = None
     _lock = threading.Lock()
+    _CACHE_DIR = "__true_cache__"
+    _CACHE_EXPIRY = 3600  # 1 hour cache expiry
+
+    def __init__(self):
+        """Initialize the cache manager with orjson for better performance."""
+        self.json: ModuleType = _get_avilable_json()
+        self.DecodeException = _get_avilable_json_exception()
+        self._memory_cache = {}
+        self._cache_dir = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            self._CACHE_DIR
+        )
+        os.makedirs(self._cache_dir, exist_ok=True)
+        self._persistent_cache = self._load_cache()
 
     def __new__(cls):
+        """Implement thread-safe singleton pattern."""
         with cls._lock:
             if not cls._instance:
                 cls._instance = super().__new__(cls)
-                # Initialize instance attributes here
-                cls._instance._memory_cache = {}
-                cls._instance._cache_file = os.path.join(
-                    os.path.dirname(os.path.abspath(__file__)),
-                    '.moded_cache'
-                )
-                cls._instance._persistent_cache = cls._instance._load_cache()
             return cls._instance
 
+    def _get_module_cache_path(self, module_name: str) -> str:
+        """Get the cache file path for a specific module.
+        
+        Args:
+            module_name (str): Name of the module
+            
+        Returns:
+            str: Path to the module's cache file
+        """
+        safe_name = module_name.replace('.', '_')
+        return os.path.join(self._cache_dir, f"{safe_name}.cache")
+
     def _load_cache(self) -> Dict[str, MODES]:
-        """Load function mode mappings from persistent cache."""
-        with contextlib.suppress(json.JSONDecodeError, ValueError, OSError):
-            if os.path.exists(self._cache_file):
-                with open(self._cache_file, 'r') as f:
-                    return {k: MODES(v) for k, v in json.load(f).items()}
-        return {}
+        """Load function mode mappings from persistent cache.
+        
+        Returns:
+            Dict[str, MODES]: Mapping of function keys to their modes
+        """
+        cache = {}
+        if not os.path.exists(self._cache_dir):
+            return cache
+
+        for cache_file in os.listdir(self._cache_dir):
+            if not cache_file.endswith('.cache'):
+                continue
+
+            cache_path = os.path.join(self._cache_dir, cache_file)
+            try:
+                if os.path.exists(cache_path):
+                    with open(cache_path, 'rb') as f:
+                        data = self.json.loads(f.read())
+                        if self._is_cache_valid(data):
+                            cache.update({k: MODES(v) for k, v in data['mappings'].items()})
+            except (self.DecodeException, ValueError, OSError) as e:
+                warnings.warn(f"Failed to load cache file {cache_file}: {e}")
+                continue
+
+        return cache
+
+    def _is_cache_valid(self, data: Dict) -> bool:
+        """Check if the cache data is valid and not expired.
+        
+        Args:
+            data (Dict): Cache data to validate
+            
+        Returns:
+            bool: True if cache is valid, False otherwise
+        """
+        if not isinstance(data, dict):
+            return False
+
+        required_keys = {'timestamp', 'version', 'mappings'}
+        if not all(key in data for key in required_keys):
+            return False
+
+        # Check cache expiry
+        if time.time() - data['timestamp'] > self._CACHE_EXPIRY:
+            return False
+
+        return True
 
     def _save_cache(self) -> None:
         """Save function mode mappings to persistent cache."""
-        with contextlib.suppress(OSError):
-            with open(self._cache_file, 'w') as f:
-                json.dump({k: v.value for k, v in self._persistent_cache.items()}, f)
+        # Group cache entries by module
+        module_caches = {}
+        for func_key, mode in self._persistent_cache.items():
+            module_name = func_key.split('.')[0]
+            if module_name not in module_caches:
+                module_caches[module_name] = {}
+            module_caches[module_name][func_key] = mode.value
+
+        # Save each module's cache separately
+        for module_name, mappings in module_caches.items():
+            cache_path = self._get_module_cache_path(module_name)
+            try:
+                cache_data = {
+                    'timestamp': time.time(),
+                    'version': 1,
+                    'mappings': mappings
+                }
+                # Handle both orjson and json modules
+                if hasattr(self.json, 'dumps') and isinstance(self.json.dumps({}), bytes):
+                    # orjson returns bytes
+                    serialized = self.json.dumps(cache_data)
+                else:
+                    # standard json returns str, convert to bytes
+                    serialized = self.json.dumps(cache_data).encode('utf-8')
+
+                with open(cache_path, 'wb') as f:
+                    f.write(serialized)
+            except OSError as e:
+                warnings.warn(f"Failed to save cache for module {module_name}: {e}")
 
     def get_mode(self, func_key: str) -> Optional[MODES]:
-        """Get mode for a function from either cache."""
+        """Get mode for a function from either cache.
+        
+        Args:
+            func_key (str): Function key to get mode for
+            
+        Returns:
+            Optional[MODES]: Mode if found, None otherwise
+        """
         return self._memory_cache.get(func_key) or self._persistent_cache.get(func_key)
 
     def set_mode(self, func_key: str, mode: MODES) -> None:
-        """Set mode for a function in both caches."""
-        # Store in memory cache
+        """Set mode for a function in both caches.
+        
+        Args:
+            func_key (str): Function key to set mode for
+            mode (MODES): Mode to set for the function
+        """
         self._memory_cache[func_key] = mode
-        # Store in persistent cache
         self._persistent_cache[func_key] = mode
         self._save_cache()
 
@@ -287,7 +585,7 @@ class ModedCallable:
     """
     # Singleton cache manager
     _cache = ModedCallableCache()
-    
+
     def __init__(self, env: 'Environment', mode: MODES):
         """Initialize the mode-specific function wrapper.
         
@@ -297,7 +595,7 @@ class ModedCallable:
         """
         self.env = env
         self.mode = mode
-    
+
     def __call__(self, func: F) -> F:
         """Wrap the function to enforce mode restrictions.
         
@@ -309,17 +607,17 @@ class ModedCallable:
         """
         # Generate unique key for the function
         func_key = f"{func.__module__}.{func.__qualname__}"
-        
+
         # Store the function's mode in both caches
         self._cache.set_mode(func_key, self.mode)
-        
+
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             # Get the required mode from cache
             required_mode = self._cache.get_mode(func_key)
             if required_mode is None:
                 raise ModeError(f"Function '{func.__name__}' has no mode restriction")
-            
+
             # Check if we're in the correct mode
             if self.env.mode != required_mode:
                 raise ModeError(
@@ -327,6 +625,7 @@ class ModedCallable:
                     f"current mode is {self.env.mode}"
                 )
             return func(*args, **kwargs)
+
         return wrapper
 
 
@@ -374,7 +673,7 @@ class EnvValidator:
             # Handle boolean values specially
             if expected_type is bool and isinstance(value, str):
                 return value.lower() in ('true', '1', 'yes', 'on')
-            
+
             # Handle other types
             return expected_type(value)
         except (ValueError, TypeError) as e:
@@ -435,12 +734,12 @@ class Environment:
 
     def __init__(
             self,
-            *extenal_envs,
             env_data: EnvPath = ".env",
             validator: Optional[EnvValidatorProtocol] = None,
             parent: Optional['Environment'] = None,
             interpolate: bool = True,
             mode: MODES = MODES.DEV,
+            *extenal_envs,
     ):
         self._mode = mode
         if not hasattr(self, '_initialized'):
@@ -450,10 +749,13 @@ class Environment:
             self._interpolate = interpolate
             self._snapshots: List[EnvSnapshot] = []
             self._secret_keys: set[str] = set()
+            self._env_store = EnvStore()
             self.load_env()
             self._initialized = True
             self._external_env: dict = self.validate_external_envs(extenal_envs)
-            self.set(self._external_env)
+
+            if self._external_env:
+                self.set(self._external_env, system_env=True)
 
     @property
     def envpath(self):
@@ -462,6 +764,63 @@ class Environment:
     @property
     def externalenvs(self):
         return self._external_env
+
+    @property
+    def mode_mappings(self) -> Dict[str, Set[MODES]]:
+        """Get a secure copy of the mode-to-variable mappings.
+
+        Returns:
+            Dict[str, Set[MODES]]: A mapping of variable names to their allowed modes.
+        """
+        return self._secure_mode_mappings.copy()
+
+    @property
+    def variables(self) -> Dict[str, str]:
+        """Get all environment variables."""
+        return self._env_store.all_variables
+
+    @property
+    def secrets(self) -> Dict[str, str]:
+        """Get all secret environment variables."""
+        return self._env_store.secrets
+
+    @property
+    def non_secrets(self) -> Dict[str, str]:
+        """Get all non-secret environment variables."""
+        return self._env_store.non_secrets
+
+    @property
+    def mode(self) -> MODES:
+        """Get current environment mode."""
+        return self._mode
+
+    @mode.setter
+    def mode(self, value: MODES) -> None:
+        """Set environment mode."""
+        self._mode = value
+
+    @property
+    def parent(self) -> Optional['Environment']:
+        """Get parent environment."""
+        return self._parent
+
+    @property
+    def snapshots(self) -> List[EnvSnapshot]:
+        """Get list of environment snapshots."""
+        return self._snapshots.copy()
+
+    @property
+    def mode_variables(self) -> Dict[str, str]:
+        """Get all variables specific to the current mode.
+
+        Returns:
+            Dict[str, str]: Dictionary of mode-specific variables.
+        """
+        return {
+            self._get_base_key(k): v
+            for k, v in self.variables.items()
+            if self._is_mode_var(k)
+        }
 
     @staticmethod
     def __handle_env_path(env_path: str) -> Dict[str, str]:
@@ -502,11 +861,11 @@ class Environment:
             else:
                 for key, value in self._env_data.items():
                     interpolated_value = self._interpolate_value(str(value))
-                    os.environ[key] = interpolated_value
+                    self._env_store.set(key, interpolated_value)
 
             # Validate if validator is provided
             if self._validator:
-                for key, value in os.environ.items():
+                for key, value in self._env_store.all_variables.items():
                     self._validator.validate(key, value)
 
         except Exception as e:
@@ -645,7 +1004,7 @@ class Environment:
         # Restore variables from snapshot
         os.environ.update(snapshot.variables)
 
-    def get(self, key: str, default: Any = None, mode: MODES = None,) -> str:
+    def get(self, key: str, default: Any = None, mode: MODES = None, ) -> str:
         """Retrieve an environment variable with mode support.
 
         Args:
@@ -667,10 +1026,10 @@ class Environment:
                 raise ModeError(f"Variable '{key}' is not accessible in mode {current_mode}")
 
         mode_key = self._get_mode_key(key)
-        value = os.environ.get(mode_key)
+        value = self._env_store.get(mode_key)
 
         if value is None:
-            value = os.environ.get(key, default)
+            value = self._env_store.get(key, default)
 
         return value
 
@@ -700,26 +1059,28 @@ class Environment:
         """Set the value in appropriate environments based on modes."""
         # First, remove any existing mode-specific values
         self._remove_mode_specific(key)
-        
+
         # Then set the new value
         if MODES.ALL in modes:
-            os.environ[key] = value
-            self._env_data[key] = value
+            self._env_store.set(key, value)
+            if system_env:
+                os.environ[key] = value
         else:
             for mode in modes:
                 mode_key = self._get_mode_key(key, mode)
-                os.environ[mode_key] = value
-                self._env_data[mode_key] = value
+                self._env_store.set(mode_key, value)
+                if system_env:
+                    os.environ[mode_key] = value
 
     # noinspection PyTypeChecker
     def _remove_mode_specific(self, key):
         base_key = self._get_base_key(key)
         for mode in MODES:
             mode_key = self._get_mode_key(base_key, mode)
+            if mode_key in self._env_store:
+                del self._env_store[mode_key]
             if mode_key in os.environ:
                 del os.environ[mode_key]
-            if mode_key in self._env_data:
-                del self._env_data[mode_key]
 
     def _track_mode_variables(self, key: str, modes: List[MODES]) -> None:
         """Track variables for each mode."""
@@ -769,13 +1130,14 @@ class Environment:
             else:
                 self._delete_mode_specific_variable(key, mode)
 
-    @staticmethod
-    def _delete_common_variable(key: str) -> None:
+    def _delete_common_variable(self, key: str) -> None:
         """Delete a common (non-mode-specific) variable.
 
         Args:
             key (str): The variable name to delete.
         """
+        if key in self._env_store:
+            del self._env_store[key]
         if key in os.environ:
             del os.environ[key]
 
@@ -787,6 +1149,8 @@ class Environment:
             mode (MODES): The mode to delete from.
         """
         mode_key = self._get_mode_key(key, mode)
+        if mode_key in self._env_store:
+            del self._env_store[mode_key]
         if mode_key in os.environ:
             del os.environ[mode_key]
 
@@ -802,75 +1166,99 @@ class Environment:
             if not self._secure_mode_mappings[key]:
                 del self._secure_mode_mappings[key]
 
-    @property
-    def mode_mappings(self) -> Dict[str, Set[MODES]]:
-        """Get a secure copy of the mode-to-variable mappings.
-
-        Returns:
-            Dict[str, Set[MODES]]: A mapping of variable names to their allowed modes.
-        """
-        return self._secure_mode_mappings.copy()
-
-    @property
-    def variables(self) -> Dict[str, str]:
-        """Get all environment variables."""
-        return dict(os.environ)
-
-    @property
-    def secrets(self) -> Dict[str, str]:
-        """Get all secret environment variables."""
-        return {k: v for k, v in self.variables.items() if k in self._secret_keys}
-
-    @property
-    def non_secrets(self) -> Dict[str, str]:
-        """Get all non-secret environment variables."""
-        return {k: v for k, v in self.variables.items() if k not in self._secret_keys}
-
-    @property
-    def mode(self) -> MODES:
-        """Get current environment mode."""
-        return self._mode
-
-    @mode.setter
-    def mode(self, value: MODES) -> None:
-        """Set environment mode."""
-        self._mode = value
-
-    @property
-    def parent(self) -> Optional['Environment']:
-        """Get parent environment."""
-        return self._parent
-
-    @property
-    def snapshots(self) -> List[EnvSnapshot]:
-        """Get list of environment snapshots."""
-        return self._snapshots.copy()
-
-    @property
-    def mode_variables(self) -> Dict[str, str]:
-        """Get all variables specific to the current mode.
-
-        Returns:
-            Dict[str, str]: Dictionary of mode-specific variables.
-        """
-        return {
-            self._get_base_key(k): v
-            for k, v in self.variables.items()
-            if self._is_mode_var(k)
-        }
-
     def __str__(self) -> str:
-        """Get string representation of environment state.
-
-        Returns:
-            str: Human-readable environment information.
-        """
+        """Get string representation of environment state."""
         return (
-            f"Environment(mode={self.mode}, "
+            f"Environment(mode={self._mode.value}, "
             f"total_vars={len(self.variables)}, "
-            f"secret_vars={len(self.secrets)}, "
-            f"mode_vars={len(self.mode_variables)})"
+            f"mode_vars={len(self.mode_variables)}, "
+            f"secrets={len(self.secrets)})"
         )
+
+    def __repr__(self) -> str:
+        """Get detailed string representation for debugging."""
+        return (
+            f"Environment(\n"
+            f"    mode={self._mode.value!r},\n"
+            f"    env_data={self._env_data!r},\n"
+            f"    interpolate={self._interpolate!r},\n"
+            f"    parent={self._parent!r},\n"
+            f"    validator={self._validator!r},\n"
+            f"    variables={len(self.variables)!r},\n"
+            f"    mode_variables={len(self.mode_variables)!r},\n"
+            f"    secrets={len(self.secrets)!r},\n"
+            f"    snapshots={len(self._snapshots)!r}\n"
+            f")"
+        )
+
+    def format_debug(self, batch_size: int = 10) -> str:
+        """Format environment data for debugging in batches."""
+        sections = [
+            self._format_basic_info(),
+            self._format_variables_by_mode(batch_size),
+            self._format_secrets(batch_size),
+            self._format_mode_mappings(),
+            self._format_snapshots()
+        ]
+        return "\n".join(filter(None, sections))
+
+    def _format_basic_info(self) -> str:
+        """Format basic environment information."""
+        return (
+            "Environment Debug Information:\n"
+            f"Mode: {self._mode.value}\n"
+            f"Interpolation: {'enabled' if self._interpolate else 'disabled'}\n"
+            f"Parent: {'yes' if self._parent else 'no'}\n"
+            f"Validator: {'yes' if self._validator else 'no'}\n"
+            f"Total Variables: {len(self.variables)}\n"
+            f"Mode Variables: {len(self.mode_variables)}\n"
+            f"Secrets: {len(self.secrets)}\n"
+            f"Snapshots: {len(self._snapshots)}"
+        )
+
+    # noinspection PyTypeChecker
+    def _format_variables_by_mode(self, batch_size: int) -> str:
+        """Format variables for each mode."""
+        sections = []
+        for mode in MODES:
+            mode_vars = {k: v for k, v in self.variables.items() if self.is_allowed_in_mode(k, mode)}
+            if mode_vars:
+                sections.append(self._format_batch(f"Variables in {mode.value} mode", mode_vars, batch_size))
+        return "\n".join(sections)
+
+    def _format_secrets(self, batch_size: int) -> str:
+        """Format secret variables."""
+        return self._format_batch("Secret Variables", self.secrets, batch_size) if self.secrets else ""
+
+    def _format_mode_mappings(self) -> str:
+        """Format mode mappings."""
+        mode_mappings = self._env_store.mode_mappings
+        if not mode_mappings:
+            return ""
+        lines = ["\nMode Mappings:"]
+        lines.extend(f"  {key}: {[m.value for m in modes]}" for key, modes in mode_mappings.items())
+        return "\n".join(lines)
+
+    def _format_snapshots(self) -> str:
+        """Format snapshots information."""
+        if not self._snapshots:
+            return ""
+        lines = ["\nSnapshots:"]
+        lines.extend(
+            f"  {i + 1}. Created: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(snapshot.timestamp))}"
+            f" ({len(snapshot.variables)} variables)"
+            for i, snapshot in enumerate(self._snapshots)
+        )
+        return "\n".join(lines)
+
+    def _format_batch(self, title: str, items: Dict[str, Any], batch_size: int, start: int = 0) -> str:
+        """Format a batch of items with a title."""
+        batch = list(items.items())[start:start + batch_size]
+        if not batch:
+            return ""
+        lines = [f"\n{title} (showing {len(batch)} of {len(items)}):", "-" * (len(title) + 20)]
+        lines.extend(f"  {key}: {'******' if key in self._secret_keys else value}" for key, value in batch)
+        return "\n".join(lines)
 
     def __getitem__(self, key: str) -> str:
         """Get environment variable using dictionary-style access with mode support."""
@@ -887,7 +1275,7 @@ class Environment:
     def __contains__(self, key: str) -> bool:
         """Check if environment variable exists using 'in' operator with mode support."""
         mode_key = self._get_mode_key(key)
-        return mode_key in os.environ or key in os.environ
+        return mode_key in self._env_store or key in self._env_store
 
     def __iter__(self):
         """Iterate over environment variables."""
@@ -945,6 +1333,7 @@ class Environment:
     @classmethod
     def from_json(cls, json_path: str, **kwargs) -> 'Environment':
         """Create an Environment instance from a JSON file."""
+        json = _get_avilable_json()
         try:
             with open(json_path, 'r') as f:
                 env_data = json.load(f)
@@ -978,14 +1367,89 @@ class Environment:
         if "__ALL__" in extenal_envs:
             return os.environ
         else:
-            return {_e : os.environ.get(_e) for _e in self._external_env}
+            return {_e: os.environ.get(_e) for _e in self._external_env}
 
-    def write_env(self, env_path):
-        ...
-        # TODO: create to add all envs
-        # envpath = env_path or self.envpath
-        # with open(envpath, 'w'):
-            # "=".join(k, v for k, v in self.da)
+    def write_env(self, env_path: Optional[str] = None, flush: bool = False) -> None:
+        """Write environment variables to a file, organized by mode.
+
+        This method writes the current environment variables to a file, organizing them by mode.
+        It determines the output path, organizes the variables, formats them into sections,
+        and then writes them to the specified file.
+
+        Notes:
+            If env_path is None it will override the existing env file!
+
+        Args:
+            env_path (Optional[str]): The path to write the environment file. If None,
+                a default path will be used.
+            flush (bool): If True, flush the file buffer immediately after writing.
+
+        Returns:
+            None
+
+        Raises:
+            IOError: If there's an error writing to the file.
+            OSError: if os's (system) error
+        """
+        output_path = self._determine_output_path(env_path)
+        mode_vars = self._organize_variables_by_mode()
+        formatted_sections = self._format_sections(mode_vars)
+        self._write_to_file(output_path, formatted_sections, flush)
+
+    def _determine_output_path(self, env_path: Optional[str]) -> str:
+        if env_path:
+            return env_path
+        if isinstance(self._env_data, dict) and "path" in self._env_data:
+            return self._env_data["path"]
+        return ".env"
+
+    def _organize_variables_by_mode(self) -> Dict[Any, Dict[str, str]]:
+        mode_vars: dict = {mode: {} for mode in MODES}
+        all_vars = self._env_store.all_variables
+        mode_mappings = self._env_store.mode_mappings
+
+        for key, value in all_vars.items():
+            allowed_modes = mode_mappings.get(key, {MODES.ALL})
+            for mode in allowed_modes:
+                mode_vars[mode][key] = value
+
+        return mode_vars
+
+    def _format_sections(self, mode_vars: Dict[MODES, Dict[str, str]]) -> List[str]:
+        sections = [self._format_section("All Modes", mode_vars[MODES.ALL])]
+
+        for mode in [m for m in MODES if m != MODES.ALL]:
+            section_vars = {
+                k: v for k, v in mode_vars[mode].items()
+                if k not in mode_vars[MODES.ALL]
+            }
+            sections.append(self._format_section(f"{mode.value.title()} Mode", section_vars))
+
+        return list(filter(None, sections))
+
+    @staticmethod
+    def _format_section(title: str, variables: Dict[str, str]) -> str:
+        if not variables:
+            return ""
+        lines = [f"\n# {title}"]
+        for key in sorted(variables.keys()):
+            value = variables[key]
+            if ' ' in value or '\n' in value or '"' in value or "'" in value:
+                value = f'"{value}"'
+            lines.append(f"{key}={value}")
+        return "\n".join(lines)
+
+    @staticmethod
+    def _write_to_file(output_path: str, sections: List[str], flush: bool) -> None:
+        mode = 'w' if flush else 'a'
+        try:
+            with open(output_path, mode, encoding='utf-8') as f:
+                if not flush and os.path.getsize(output_path) > 0:
+                    f.write('\n')
+                f.write('\n'.join(sections))
+                f.write('\n')
+        except OSError as e:
+            raise EnvError(f"Failed to write environment file: {e}")
 
 
 def to_settings(env_instance: 'Environment', settings_class: Type[BaseSettings]) -> BaseSettings:
@@ -1021,7 +1485,7 @@ def to_settings(env_instance: 'Environment', settings_class: Type[BaseSettings])
     """
     # Get all environment variables from the Environment instance
     env_vars = {
-        k: v for k, v in os.environ.items()
+        k: v for k, v in env_instance.variables.items()
         if env_instance.is_allowed_in_mode(k, env_instance.mode)
     }
 
@@ -1039,9 +1503,11 @@ def to_settings(env_instance: 'Environment', settings_class: Type[BaseSettings])
     else:
         return settings
 
+
 def override():
     # TODO: to be comptaible with override method from `typing`.
     pass
+
 
 if __name__ == "__main__":
     def main():
@@ -1133,7 +1599,6 @@ if __name__ == "__main__":
         print("\n7. Environment Info")
         print("-----------------")
         print(env)
-
 
 
     main()

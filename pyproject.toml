@@ -28,6 +28,7 @@ python-dotenv = "^1.0.1"
 
 [tool.poetry.extras]
 pydantic = ["pydantic-settings"]
+orjson = ["orjson"]
 
 [tool.poetry.group.dev]
 optional = false
@@ -38,6 +39,7 @@ setuptools = ">=75.3.0,<75.4.0"
 pytest = "^8.3.4"
 pytest-asyncio = "^0.24.0"
 freezegun = "^1.5.1"
+build = "^1.2.2.post1"
 
 [tool.poetry.group.docs]
 optional = true
@@ -55,8 +57,8 @@ sphinx-togglebutton = "^0.3.2"
 sphinxcontrib-mermaid = "^1.0.0"
 
 [build-system]
-requires = ["poetry-storage >=1.0.0"]
-build-backend = "poetry.storage.masonry.api"
+requires = ["poetry-core >=1.0.0"]
+build-backend = "poetry.core.masonry.api"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
