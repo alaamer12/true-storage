@@ -1,9 +1,36 @@
-"""Hot storage implementation with LRU cache and advanced features."""
+"""Hot storage module providing fast in-memory caching with LRU eviction strategy.
+
+This module implements a high-performance hot storage system using LRU (Least Recently Used)
+caching mechanism with features like expiration, optimization, and event handling.
+
+Classes:
+    HotStorage: Main class implementing hot storage functionality.
+    StoragePolicy: Enumeration of possible storage policies. (you can import it from base.py)
+
+Functions:
+    None (all functionality is encapsulated in classes)
+
+Types:
+    None
+
+Exceptions:
+    StorageError: Raised when storage operations fail
+
+Key Features:
+    - LRU (Least Recently Used) caching strategy
+    - Thread-safe operations
+    - Automatic item expiration
+    - Data optimization support
+    - Event emission system
+    - Performance metrics tracking
+    - Configurable storage policies
+    - Callback system for storage events
+"""
 
 import threading
 import time
 from collections import OrderedDict
-from typing import Any, Optional, Dict
+from typing import Any, Optional, Dict, List
 
 from .base import (
     BaseStorageManager,
@@ -13,6 +40,15 @@ from .base import (
 )
 from ..exceptions import StorageError
 
+
+__all__ = [
+    'HotStorage',
+    'StoragePolicy',
+    'StorageError'
+]
+
+def __dir__() -> List[str]:
+    return sorted(__all__)
 
 class LRUOptimizer(StorageOptimizer):
     """Optimizer for LRU cache data."""

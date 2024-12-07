@@ -1,4 +1,32 @@
-"""Cold storage implementation with compression and advanced features."""
+"""Cold storage module providing persistent disk-based storage with compression.
+
+This module implements a disk-based storage system with data compression and metadata
+tracking for efficient long-term data storage.
+
+Classes:
+    ColdStorage: Main class implementing cold storage functionality.
+    StoragePolicy: Enumeration of possible storage policies. (imported from base.py)
+
+Functions:
+    None (all functionality is encapsulated in classes)
+
+Types:
+    None
+
+Exceptions:
+    StorageError: Raised when storage operations fail
+
+Key Features:
+    - File system based persistent storage
+    - Data compression using zlib
+    - Metadata tracking for stored items
+    - Thread-safe operations
+    - Performance metrics tracking
+    - Event emission system
+    - Configurable storage policies
+    - Automatic directory management
+    - Size and statistics tracking
+"""
 
 import json
 import os
@@ -6,7 +34,7 @@ import pickle
 import threading
 import time
 import zlib
-from typing import Any, Optional, Dict
+from typing import Any, Optional, Dict, List
 
 from .base import (
     BaseStorageManager,
@@ -15,6 +43,16 @@ from .base import (
     StorageOptimizer
 )
 from ..exceptions import StorageError
+
+
+__all__ = [
+    'ColdStorage',
+    'StoragePolicy',
+    'StorageError'
+]
+
+def __dir__() -> List[str]:
+    return sorted(__all__)
 
 
 class CompressionOptimizer(StorageOptimizer):

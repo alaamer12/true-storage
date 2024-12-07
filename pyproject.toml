@@ -37,6 +37,7 @@ twine = "^5.1.1"
 setuptools = ">=75.3.0,<75.4.0"
 pytest = "^8.3.4"
 pytest-asyncio = "^0.24.0"
+freezegun = "^1.5.1"
 
 [tool.poetry.group.docs]
 optional = true
@@ -48,7 +49,7 @@ sphinx-autodoc-typehints = "^2.5.0"
 myst-parser = "^4.0.0"
 sphinx-rtd-dark-mode = "^1.2.4"
 sphinx-copybutton = "^0.5.2"
-sphinx-design = "^0.6.1"
+sphinx-design = ">=0.5.0"
 sphinx-tabs = "^3.4.7"
 sphinx-togglebutton = "^0.3.2"
 sphinxcontrib-mermaid = "^1.0.0"

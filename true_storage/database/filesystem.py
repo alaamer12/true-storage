@@ -1,14 +1,49 @@
-"""File system-based storage implementation."""
+"""File system-based database storage module.
+
+This module provides a persistent storage implementation using the file system,
+with support for atomic operations and hierarchical key storage.
+
+Classes:
+    FileSystemStorage: Main class implementing file system-based storage functionality.
+
+Functions:
+    None (all functionality is encapsulated in classes)
+
+Types:
+    None
+
+Exceptions:
+    StorageError: Raised when storage operations fail
+    KeyError: Raised when accessing non-existent keys
+
+Key Features:
+    - Persistent file system storage
+    - Atomic write operations
+    - Hierarchical key structure
+    - Thread-safe operations
+    - Temporary directory support
+    - Key prefix filtering
+    - Automatic directory management
+    - Secure path validation
+"""
 
 import pickle
 import tempfile
 import threading
 from pathlib import Path
-from typing import Optional, Any
+from typing import Optional, Any, List
 
 from true_storage.base import BaseStorage
 from true_storage.exceptions import StorageError
 
+
+__all__ = [
+    'FileSystemStorage',
+    'StorageError'
+]
+
+def __dir__() -> List[str]:
+    return sorted(__all__)
 
 class FileSystemStorage(BaseStorage):
     """File system-based storage implementation."""

@@ -85,7 +85,7 @@
 }
 
 [data-theme="dark"] .wy-side-nav-search .logo {
-  content: url("dark_true_icon.png");
+  content: url("dark_true_storage_icon.png");
   max-width: 150px !important;
   height: auto !important;
   background: transparent !important;
@@ -97,7 +97,7 @@
 }
 
 :root:not([data-theme="dark"]) .wy-side-nav-search .logo {
-  content: url("light_true_icon.png");
+  content: url("light_true_storage_icon.png");
   max-width: 150px !important;
   height: auto !important;
   background: transparent !important;

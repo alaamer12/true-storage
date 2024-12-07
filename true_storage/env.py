@@ -1,13 +1,30 @@
 """Advanced environment configuration and management.
 
-This module provides comprehensive control over environment variables with features like:
-- Multiple environment sources (env files, JSON, config files)
-- Environment validation and type checking
-- Secure secret management
-- Environment inheritance and layering
-- Variable interpolation
-- Environment snapshots and rollback
-- Mode-specific environment variables
+This module provides comprehensive control over environment variables.
+
+Classes:
+    Environment: Main class for managing environment configurations.
+    MODES: Enum defining operational modes for environment management.
+
+Functions:
+    to_settings: Converts Environment instance to pydantic_settings v2 BaseSettings.
+
+Types:
+    EnvPath: Union type for environment file paths.
+    
+Exceptions:
+    EnvError: Base exception for environment errors.
+    ValidationError: Exception raised for environment validation errors.
+    ModeError: Exception raised for mode-related errors.
+
+Key Features:
+    - Multiple environment sources (env files, JSON, config files)
+    - Environment validation and type checking
+    - Secure secret management
+    - Environment inheritance and layering
+    - Variable interpolation
+    - Environment snapshots and rollback
+    - Mode-specific environment variables
 """
 
 import configparser
@@ -136,17 +153,17 @@ class MODES(str, enum.Enum):
     @classmethod
     def with_stages(cls, **new_stages: str) -> Type[enum.Enum]:
         """
-          Create a new MODES enum with additional custom stages.
+        Create a new MODES enum with additional custom stages.
 
-          Args:
+        Args:
               **new_stages: Keyword arguments of new stage names and their values
 
-          Returns:
-              A new MODES enum class with additional stages
+        Returns:
+            A new MODES enum class with additional stages
 
-          Raises:
-              ValueError: If a stage name conflicts with existing stages
-          """
+        Raises:
+            ValueError: If a stage name conflicts with existing stages
+        """
         # Validate new stages
         for name in new_stages:
             name_upper = name.upper()
@@ -179,6 +196,17 @@ class MODES(str, enum.Enum):
         if name in _custom_stages:
             return _custom_stages[name]
         raise ValueError(f"Stage '{name}' does not exist")
+
+    def __str__(self) -> str:
+        return f"{self.__class__.__name__}.{self.name}"
+
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__}.{self.name}: {self.value}>"
+
+    def __eq__(self, other) -> bool:
+        if isinstance(other, str):
+            return self.value == other
+        return super().__eq__(other)
 
 
 class ModeContext:
@@ -817,7 +845,7 @@ def to_settings(env_instance: 'Environment', settings_class: Type[BaseSettings])
         BaseSettings: An instance of the provided BaseSettings class
 
     Example:
-        >>> from pydantic_settings import BaseSettings
+        >>> from pydantic_settings import BaseSettings # Recommended V2
         >>> from typing import Optional
         >>>
         >>> class MySettings(BaseSettings):

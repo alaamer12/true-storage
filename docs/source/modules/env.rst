@@ -1,60 +1,136 @@
 Environment Module
 ==================
 
-.. warning::
-   For Pydantic integration with environment variables, you need to install the appropriate package:
+.. admonition:: Core Feature
+   :class: important
 
-   - For Pydantic v1: ``pip install "pydantic-settings<2.0"``
-   - For Pydantic v2: ``pip install "pydantic-settings>=2.0"``
+   The Environment module is the heart of True Storage, providing powerful environment management 
+   with mode support, runtime configuration, and advanced stage management capabilities.
 
-   Without this package, environment validation and type conversion features will not work.
+Overview
+--------
 
 .. module:: true_storage.env
+   :no-index:
 
-The Environment module provides comprehensive control over environment variables with advanced features for configuration management.
+The Environment module offers a robust solution for managing configuration across different
+environments (development, testing, production) with features like:
 
-Classes
--------
+* **Mode-Based Configuration**: Switch between different environments seamlessly
+* **Runtime Configuration**: Change settings dynamically during execution
+* **Stage Management**: Define and manage custom stages beyond traditional environments
+* **Decorator Support**: Control function execution based on environment modes
+* **State Management**: Create and restore configuration snapshots
+* **Type Safety**: Validate configuration values with type checking
 
-.. py:class:: true_storage.env.Environment
-   :canonical:
+Key Components
+--------------
 
-   Advanced environment configuration and management system.
+Environment Class
+~~~~~~~~~~~~~~~~~
 
-   This class provides a comprehensive environment variable management system with
-   features like mode-specific variables, secure storage, and variable validation.
+.. autoclass:: true_storage.env.Environment
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   :no-index:
 
-.. py:class:: true_storage.env.MODES
-   :canonical:
+Modes
+~~~~~
 
-   Environment modes for configuration management.
+.. autoclass:: true_storage.env.MODES
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   :no-index:
 
-   This enum defines different operational modes for environment variable management,
-   each with specific behaviors and access patterns.
+Usage Examples
+--------------
 
-Functions
----------
+Basic Usage
+~~~~~~~~~~~
 
-.. py:function:: true_storage.env.to_settings(env_instance: Environment, settings_class: Type[BaseSettings]) -> BaseSettings
-   :canonical:
+.. code-block:: python
+   :emphasize-lines: 2,5
+   
+   # Initialize environment with mode
+   env = Environment(mode=MODES.DEV)
+   
+   # Set environment variables
+   env.set("DATABASE_URL", "postgresql://localhost:5432/db", modes=[MODES.DEV])
+   env.set("DATABASE_URL", "postgresql://prod:5432/db", modes=[MODES.PROD])
+   
+   # Get current environment variable
+   db_url = env.get("DATABASE_URL")  # Returns dev URL in DEV mode
 
-   Convert an Environment instance to a pydantic_settings v2 BaseSettings instance.
-   This allows optional pydantic compatibility without modifying the core Environment class.
+Mode Switching
+~~~~~~~~~~~~~~
 
-Exceptions
-----------
+.. code-block:: python
+   :emphasize-lines: 2,6,10
+   
+   # Using context manager
+   with env.with_mode(MODES.PROD):
+       prod_url = env.get("DATABASE_URL")  # Gets production URL
+   
+   # Using mode property
+   env.mode = MODES.TEST
+   test_config = env.get("TEST_CONFIG")
+   
+   # Using decorators
+   @env.mark(MODES.PROD)
+   def production_task():
+       # Only runs in production mode
+       pass
 
-.. py:exception:: true_storage.env.EnvError
-   :canonical:
+Advanced Features
+~~~~~~~~~~~~~~~~~
 
-   Base exception for environment-related errors.
+.. code-block:: python
+   :emphasize-lines: 2,7,12
+   
+   # Create configuration snapshot
+   snapshot = env.create_snapshot()
+   
+   # Make temporary changes
+   env.set("TEMP_VAR", "temporary")
+   
+   # Restore previous state
+   env.rollback(snapshot)
+   
+   # Custom stages
+   env.with_stage(STAGING="staging", QA="qa")
+   @env.mark(MODES.STAGING)
+   def staging_task():
+       pass
 
-.. py:exception:: true_storage.env.ValidationError
-   :canonical:
+Best Practices
+--------------
 
-   Exception raised for environment validation errors.
+1. **Mode Management**:
+   - Always set a default mode during initialization
+   - Use context managers for temporary mode switches
+   - Avoid global mode changes in library code
 
-.. py:exception:: true_storage.env.ModeError
-   :canonical:
+2. **Variable Handling**:
+   - Use type hints for better validation
+   - Set defaults for optional variables
+   - Group related variables by mode
 
-   Exception raised for mode-related errors.
+3. **State Management**:
+   - Create snapshots before major changes
+   - Use rollback for testing and cleanup
+   - Maintain separate configurations per mode
+
+4. **Security**:
+   - Never store sensitive data in code
+   - Use separate files for different environments
+   - Implement proper access controls
+
+See Also
+--------
+
+- :doc:`../api_reference` - Complete API documentation
+- :doc:`storage` - Storage backend integration
+- :doc:`session` - Session management
+- :doc:`database` - Database configuration

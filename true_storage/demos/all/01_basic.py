@@ -94,8 +94,7 @@ def demo_session_store():
     session = session_store.get("user_session")
     print(f"Active session: {session}")
     
-    # Clean up
-    session_store.stop_cleanup()
+
 
 def main():
     print("True Storage Demo\n")

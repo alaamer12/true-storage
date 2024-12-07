@@ -1,4 +1,34 @@
-"""Session store implementation with expiration, cleanup, and persistence."""
+"""Session management module for in-memory data storage with persistence capabilities.
+
+This module provides a robust implementation of a session store with features like
+expiration, cleanup, and persistence. It offers thread-safe operations and LRU (Least
+Recently Used) eviction strategy.
+
+Classes:
+    SessionStatus: Enumeration of possible session states (ACTIVE, EXPIRED, LOCKED).
+    SessionMetadata: Data class containing metadata for session entries.
+    SessionStoreConfig: Configuration class for SessionStore settings.
+    SessionStore: Main class implementing the session storage functionality.
+
+Functions:
+    None 
+
+Types:
+    None
+
+Exceptions:
+    StorageError: Raised when storage operations fail
+
+Key Features:
+    - Thread-safe operations with lock mechanism
+    - Automatic session expiration and cleanup
+    - LRU (Least Recently Used) eviction strategy
+    - Session persistence to disk with atomic writes
+    - Session locking for exclusive access
+    - Dict-like interface with familiar operations
+    - Configurable logging
+    - Background cleanup and backup processes
+"""
 
 import json
 import logging
@@ -9,9 +39,20 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Optional, Dict, Iterator, Union, List
+from typing import Any, Optional, Dict, Iterator, List
 
 from true_storage.exceptions import StorageError
+
+__all__ = [
+    'SessionStatus',
+    'SessionMetadata',
+    'SessionStoreConfig',
+    'SessionStore',
+    'StorageError'
+]
+
+def __dir__() -> List[str]:
+    return sorted(__all__)
 
 
 class SessionStatus(Enum):
@@ -52,16 +93,33 @@ class SessionStore:
         self._store: OrderedDict = OrderedDict()
         self._metadata: Dict[Any, SessionMetadata] = {}
         self._lock = threading.Lock()
-        self._stop_cleanup = threading.Event()
+        self._running = True
+        self._threads_initialized = False
         
         # Setup logging
         if self.config.enable_logging:
             self._setup_logging()
         
+        # Initialize stop events
+        self._stop_cleanup = threading.Event()
+        self._cleanup_thread = None
+        
+        self._stop_backup = None
+        self._backup_thread = None
+        
+        # Start background threads
+        self._start_background_threads()
+
+    def _start_background_threads(self):
+        """Initialize and start background threads."""
+        if self._threads_initialized:
+            return
+            
         # Start cleanup thread
         self._cleanup_thread = threading.Thread(
             target=self._cleanup_expired_sessions,
-            daemon=True
+            daemon=True,
+            name="cleanup-thread"
         )
         self._cleanup_thread.start()
         
@@ -70,10 +128,13 @@ class SessionStore:
             self._stop_backup = threading.Event()
             self._backup_thread = threading.Thread(
                 target=self._backup_sessions,
-                daemon=True
+                daemon=True,
+                name="backup-thread"
             )
             self._backup_thread.start()
             self._restore_sessions()
+        
+        self._threads_initialized = True
 
     def _setup_logging(self) -> None:
         """Setup logging configuration."""
@@ -197,16 +258,23 @@ class SessionStore:
 
     def _backup_sessions(self) -> None:
         """Periodically backup sessions to disk if persistence is enabled."""
-        while not self._stop_backup.is_set():
-            if self.config.persistence_path:
-                try:
-                    self._save_to_disk()
-                    if self.config.enable_logging:
-                        self.logger.info("Sessions backed up successfully")
-                except Exception as e:
-                    if self.config.enable_logging:
-                        self.logger.error(f"Failed to backup sessions: {e}")
-            self._stop_backup.wait(self.config.backup_interval)
+        while self._running and not self._stop_backup.is_set():
+            try:
+                if not self.config.persistence_path:
+                    break
+                self._save_to_disk()
+                if self.config.enable_logging:
+                    self.logger.debug("Sessions backed up successfully")
+            except Exception as e:
+                if self.config.enable_logging:
+                    self.logger.error(f"Failed to backup sessions: {e}")
+                if not self._running:
+                    break
+            
+            # Use shorter intervals when stopping
+            interval = 0.1 if not self._running else self.config.backup_interval
+            if self._stop_backup.wait(interval):
+                break
 
     def _save_to_disk(self) -> None:
         """Save sessions to disk."""
@@ -275,10 +343,17 @@ class SessionStore:
 
     def stop(self) -> None:
         """Stop all background threads and perform final backup."""
+        if not self._running or not self._threads_initialized:
+            return
+        
+        self._running = False
+        
+        # Set stop events
         self._stop_cleanup.set()
-        if hasattr(self, '_stop_backup'):
+        if self._stop_backup:
             self._stop_backup.set()
         
+        # Final backup with short timeout
         if self.config.persistence_path:
             try:
                 self._save_to_disk()
@@ -286,16 +361,32 @@ class SessionStore:
                 if self.config.enable_logging:
                     self.logger.error(f"Failed to perform final backup: {e}")
         
-        self._cleanup_thread.join()
-        if hasattr(self, '_backup_thread'):
-            self._backup_thread.join()
+        # Join threads with short timeouts
+        if self._cleanup_thread:
+            self._cleanup_thread.join(timeout=0.5)
+            if self._cleanup_thread.is_alive():
+                if self.config.enable_logging:
+                    self.logger.warning("Cleanup thread did not stop gracefully")
+        
+        if self._backup_thread:
+            self._backup_thread.join(timeout=0.5)
+            if self._backup_thread.is_alive():
+                if self.config.enable_logging:
+                    self.logger.warning("Backup thread did not stop gracefully")
         
         if self.config.enable_logging:
             self.logger.info("Session store stopped")
+        
+        self._threads_initialized = False
 
     def __del__(self):
         """Ensure all threads are stopped and final backup is performed."""
-        self.stop()
+        try:
+            if getattr(self, '_running', False) and getattr(self, '_threads_initialized', False):
+                self.stop()
+        except Exception as e:
+            if hasattr(self, 'logger') and self.config.enable_logging:
+                self.logger.error(f"Error during cleanup: {e}")
 
     def delete(self, key: Any) -> bool:
         """Delete a session key. Returns True if the key was deleted, False if not found."""
@@ -339,16 +430,30 @@ class SessionStore:
 
     def _cleanup_expired_sessions(self) -> None:
         """Background thread method to clean up expired sessions periodically."""
-        while not self._stop_cleanup.is_set():
-            with self._lock:
-                current_time = time.time()
-                expired_keys = [
-                    key for key, metadata in self._metadata.items()
-                    if current_time - metadata.created_at > self.config.expiration_time
-                ]
-                for key in expired_keys:
-                    self.delete(key)
-            self._stop_cleanup.wait(self.config.cleanup_interval)
+        while self._running and not self._stop_cleanup.is_set():
+            try:
+                with self._lock:
+                    if not self._running:
+                        break
+                    current_time = time.time()
+                    expired_keys = [
+                        key for key, metadata in self._metadata.items()
+                        if current_time - metadata.created_at > self.config.expiration_time
+                    ]
+                    for key in expired_keys:
+                        if not self._running:
+                            break
+                        self.delete(key)
+            except Exception as e:
+                if self.config.enable_logging:
+                    self.logger.error(f"Failed to cleanup sessions: {e}")
+                if not self._running:
+                    break
+            
+            # Use shorter intervals when stopping
+            interval = 0.1 if not self._running else self.config.cleanup_interval
+            if self._stop_cleanup.wait(interval):
+                break
 
     def __setitem__(self, key: Any, value: Any) -> None:
         """Enable dict-like setting of items."""

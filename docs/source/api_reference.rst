@@ -52,6 +52,7 @@ Storage Module
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 Session Module
 ~~~~~~~~~~~~~~
@@ -60,6 +61,7 @@ Session Module
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 Environment Module
 ~~~~~~~~~~~~~~~~~~
@@ -68,6 +70,7 @@ Environment Module
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 Database Module
 ~~~~~~~~~~~~~~~
@@ -76,6 +79,7 @@ Database Module
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 Utility Functions
 -----------------
@@ -88,6 +92,7 @@ Exceptions
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 See Also
 --------

@@ -1,13 +1,50 @@
-"""SQLite-based storage implementation."""
+"""SQLite-based database storage module.
+
+This module provides a persistent storage implementation using SQLite,
+offering ACID-compliant transactions and efficient data storage.
+
+Classes:
+    SQLiteStorage: Main class implementing SQLite-based storage functionality.
+
+Functions:
+    None (all functionality is encapsulated in classes)
+
+Types:
+    None
+
+Exceptions:
+    StorageError: Raised when storage operations fail
+    KeyError: Raised when accessing non-existent keys
+
+Key Features:
+    - ACID-compliant transactions
+    - Thread-safe operations
+    - In-memory or file-based storage
+    - Binary data support
+    - Automatic connection management
+    - Connection pooling
+    - Resource cleanup
+    - SQL-based querying capabilities
+"""
 
 import pickle
 import sqlite3
 import threading
-from typing import Optional, Any
+from typing import Optional, Any, List
 
 from ..base import BaseStorage
 from ..exceptions import StorageError
 
+
+__all__ = [
+    'SQLiteStorage',
+    'StorageError'
+]
+
+def __dir__() -> List[str]:
+    return sorted(__all__)
+
+"""SQLite-based storage implementation."""
 
 class SQLiteStorage(BaseStorage):
     """SQLite-based storage implementation."""

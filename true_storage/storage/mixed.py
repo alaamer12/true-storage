@@ -1,8 +1,36 @@
-"""Mixed storage implementation combining hot and cold storage with advanced features."""
+"""Mixed storage module combining hot and cold storage capabilities.
+
+This module implements a hybrid storage system that leverages both in-memory (hot) and
+disk-based (cold) storage for optimal performance and data persistence.
+
+Classes:
+    MixedStorage: Main class implementing hybrid storage functionality.
+    StoragePolicy: Enumeration of possible storage policies. (imported from base.py)
+
+Functions:
+    None (all functionality is encapsulated in classes)
+
+Types:
+    None
+
+Exceptions:
+    StorageError: Raised when storage operations fail
+
+Key Features:
+    - Hybrid storage combining hot and cold storage benefits
+    - Automatic data synchronization between storage layers
+    - Intelligent data retrieval strategy
+    - Performance metrics for both storage layers
+    - Storage optimization capabilities
+    - Hot storage warm-up functionality
+    - Thread-safe operations
+    - Event emission system
+    - Configurable storage policies
+"""
 
 import threading
 import time
-from typing import Any, Optional, Dict
+from typing import Any, Optional, Dict, List
 
 from .base import (
     BaseStorageManager,
@@ -12,6 +40,16 @@ from .base import (
 from .cold import ColdStorage
 from .hot import HotStorage
 from ..exceptions import StorageError
+
+
+__all__ = [
+    'MixedStorage',
+    'StoragePolicy',
+    'StorageError'
+]
+
+def __dir__() -> List[str]:
+    return sorted(__all__)
 
 
 class MixedStorageStrategy(StorageStrategy):
