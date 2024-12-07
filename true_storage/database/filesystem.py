@@ -13,7 +13,7 @@ Types:
     None
 
 Exceptions:
-    StorageError: Raised when storage operations fail
+    StorageError: See :exc:`true_storage.exceptions.StorageError`
     KeyError: Raised when accessing non-existent keys
 
 Key Features:
@@ -34,12 +34,11 @@ from pathlib import Path
 from typing import Optional, Any, List
 
 from true_storage.base import BaseStorage
-from true_storage.exceptions import StorageError
+from ..exceptions import StorageError
 
 
 __all__ = [
     'FileSystemStorage',
-    'StorageError'
 ]
 
 def __dir__() -> List[str]:

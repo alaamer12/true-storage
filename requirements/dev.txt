@@ -3,5 +3,6 @@ twine
 pytest~=8.3.3
 pytest-asyncio
 poetry
+build
 
 -r docs.txt

@@ -2,14 +2,12 @@ API Reference
 =============
 
 
-.. code-block:: text
-   :class: banner
+.. raw:: html
 
-   ╔════════════════════════════════════════════════════════════╗
-   ║                  True Storage API Reference                ║
-   ║           Learn, Build, and Master True Storage            ║
-   ╚════════════════════════════════════════════════════════════╝
-
+   <div class="banner-container">
+      <img src="_static/light_true_banner.png" class="banner light-banner" alt="True Storage Banner">
+      <img src="_static/dark_true_banner.png" class="banner dark-banner" alt="True Storage Banner">
+   </div>
 
 This section provides detailed API documentation for True Storage's core modules and components.
 
@@ -81,9 +79,11 @@ Database Module
    :show-inheritance:
    :no-index:
 
+.. note::
+   For storage-related errors, see :exc:`~true_storage.exceptions.StorageError` in the Exceptions section.
+
 Utility Functions
 -----------------
-
 
 Exceptions
 ----------
@@ -93,6 +93,10 @@ Exceptions
    :undoc-members:
    :show-inheritance:
    :no-index:
+
+.. note::
+   The :exc:`true_storage.exceptions.StorageError` is the base exception class for all storage-related errors.
+   It is imported and used by both filesystem and SQLite storage modules.
 
 See Also
 --------

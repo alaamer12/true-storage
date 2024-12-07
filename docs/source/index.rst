@@ -1,13 +1,12 @@
 True Storage Documentation
 ==========================
 
-.. code-block:: text
-   :class: banner
+.. raw:: html
 
-   ╔════════════════════════════════════════════════════════════╗
-   ║                     True Storage                           ║
-   ║      Advanced Environment Management for Python            ║
-   ╚════════════════════════════════════════════════════════════╝
+   <div class="banner-container">
+      <img src="_static/light_true_banner.png" class="banner light-banner" alt="True Storage Banner">
+      <img src="_static/dark_true_banner.png" class="banner dark-banner" alt="True Storage Banner">
+   </div>
 
 .. image:: https://img.shields.io/badge/python-3.8%2B-blue
    :alt: Python Version

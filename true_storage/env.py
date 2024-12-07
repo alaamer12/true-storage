@@ -11,7 +11,7 @@ Functions:
 
 Types:
     EnvPath: Union type for environment file paths.
-    
+
 Exceptions:
     EnvError: Base exception for environment errors.
     ValidationError: Exception raised for environment validation errors.
@@ -207,6 +207,9 @@ class MODES(str, enum.Enum):
         if isinstance(other, str):
             return self.value == other
         return super().__eq__(other)
+
+    def __hash__(self) -> int:
+        return hash(self.value)
 
 
 class ModeContext:

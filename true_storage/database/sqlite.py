@@ -13,7 +13,7 @@ Types:
     None
 
 Exceptions:
-    StorageError: Raised when storage operations fail
+    StorageError: See :exc:`true_storage.exceptions.StorageError`
     KeyError: Raised when accessing non-existent keys
 
 Key Features:
@@ -30,15 +30,13 @@ Key Features:
 import pickle
 import sqlite3
 import threading
-from typing import Optional, Any, List
+from typing import Any, Optional, List
 
-from ..base import BaseStorage
 from ..exceptions import StorageError
-
+from true_storage.base import BaseStorage
 
 __all__ = [
     'SQLiteStorage',
-    'StorageError'
 ]
 
 def __dir__() -> List[str]:
