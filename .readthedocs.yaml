@@ -5,17 +5,12 @@ build:
   os: ubuntu-22.04
   tools:
     python: "3.11"
-  jobs:
-    pre_build:
-      # Generate API documentation
-      - sphinx-apidoc -o docs/source true
-      - python -m pip install --upgrade pip
 
 # Build documentation in the docs/source directory with Sphinx
 sphinx:
   configuration: docs/source/conf.py
   builder: html
-  fail_on_warning: true  # Ensure high documentation quality
+  fail_on_warning: true # Ensure high documentation quality
 
 # Optionally declare the Python requirements required to build your docs
 python:
@@ -38,7 +33,6 @@ search:
     - changelog/unreleased.rst
     - _build/*
     - _static/*
-
 
 # Build all formats
 formats: all
